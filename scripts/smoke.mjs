@@ -41,7 +41,7 @@ function makePng(w = 120, h = 80) {
 
 async function check(name, fn) {
   try { await fn(); log(true, name); }
-  catch (e) { log(false, `${name}: ${e.message.split('\n')[0]}`); }
+  catch (e) { log(false, `${name}: ${e.message.split('\n').filter(l => l.trim() && !/^\s*-\s*(waiting for|locator resolved|attempting|  retrying)/.test(l)).slice(0, 4).join(' | ').slice(0, 500)}`); }
 }
 
 const count = (page, sel) => page.locator(sel).count();
@@ -65,77 +65,11 @@ await page.waitForTimeout(600);
 await page.screenshot({ path: `${OUT}/01-desktop-claro.png` });
 
 const pane = page.locator('.react-flow__pane');
-
-await check('adiciona componente pela paleta (atalho C)', async () => {
-  const before = await count(page, '.react-flow__node-component');
-  await pane.click({ position: { x: 1000, y: 650 } });
-  await page.keyboard.press('c');
-  await page.locator('.picker').waitFor();
-  await page.screenshot({ path: `${OUT}/02-paleta.png` });
-  await page.locator('.pick', { hasText: 'Fila' }).click();
-  await page.waitForTimeout(200);
-  const after = await count(page, '.react-flow__node-component');
-  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
-});
-
-await check('cria nota adesiva e escreve', async () => {
-  await page.keyboard.press('Escape');
-  await page.keyboard.press('n');
-  await pane.click({ position: { x: 300, y: 700 } });
-  const ta = page.locator('.n-note textarea');
-  await ta.waitFor();
-  await ta.type('Risco: o banco aguenta 5x?');
-  await page.keyboard.press('Escape');
-  await page.locator('.n-note', { hasText: 'Risco: o banco aguenta 5x?' }).waitFor();
-});
-
-await check('cria área (frame)', async () => {
-  const before = await count(page, '.react-flow__node-frame');
-  await page.keyboard.press('f');
-  await pane.click({ position: { x: 1100, y: 250 } });
-  await page.keyboard.press('Escape');
-  await page.waitForTimeout(200);
-  if ((await count(page, '.react-flow__node-frame')) !== before + 1) throw new Error('área não criada');
-});
-
-await check('adiciona imagem pelo seletor de arquivo', async () => {
-  await page.setInputFiles('#image-input', { name: 'diagrama.png', mimeType: 'image/png', buffer: makePng() });
-  await page.locator('.n-image img').first().waitFor({ timeout: 5000 });
-});
-
-await check('desfazer remove a imagem e refazer devolve', async () => {
-  const before = await count(page, '.react-flow__node-image');
-  await page.locator('.react-flow__pane').click({ position: { x: 700, y: 820 } });
-  await page.keyboard.press('Control+z');
-  await page.waitForTimeout(200);
-  const undone = await count(page, '.react-flow__node-image');
-  await page.keyboard.press('Control+Shift+z');
-  await page.waitForTimeout(200);
-  const redone = await count(page, '.react-flow__node-image');
-  if (!(undone === before - 1 && redone === before)) throw new Error(`${before} -> ${undone} -> ${redone}`);
-});
-
-await check('conecta dois componentes arrastando a alça', async () => {
-  const before = await count(page, '.react-flow__edge');
-  await page.keyboard.press('Escape');
-  await page.locator('[data-testid="rf__wrapper"], .react-flow').first().click({ position: { x: 5, y: 5 } }).catch(() => {});
-  await page.locator('button[aria-label="Enquadrar tudo"]').click();
-  await page.waitForTimeout(400);
-  const src = page.locator('.react-flow__node[data-id="a5"]');
-  await src.hover();
-  const h = src.locator('.react-flow__handle-right');
-  const hb = await h.boundingBox();
-  const tb = await page.locator('.react-flow__node[data-id="a4"]').boundingBox();
-  if (!hb || !tb) throw new Error('elementos não encontrados');
-  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 12 });
-  await page.mouse.up();
-  await page.waitForTimeout(300);
-  const after = await count(page, '.react-flow__edge');
-  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
-});
-await page.screenshot({ path: `${OUT}/03-apos-edicoes.png` });
+/** Clica no fundo do quadro numa posição relativa (0 a 1), longe das barras flutuantes. */
+async function paneAt(fx, fy) {
+  const b = await pane.boundingBox();
+  await page.mouse.click(b.x + b.width * fx, b.y + b.height * fy);
+}
 
 await check('inspetor mostra detalhes do componente', async () => {
   await page.locator('.react-flow__node[data-id="a3"]').click();
@@ -145,23 +79,114 @@ await check('inspetor mostra detalhes do componente', async () => {
   if (v !== 'Serviço de links') throw new Error(`nome: ${v}`);
 });
 
-await check('resumo para IA inclui cenário e anotações', async () => {
+await check('conecta soltando a linha em cima de outro componente', async () => {
+  await page.keyboard.press('Escape');
+  const before = await count(page, '.react-flow__edge');
+  const src = page.locator('.react-flow__node[data-id="a5"]');
+  await src.hover();
+  const hb = await src.locator('.react-flow__handle-right').boundingBox();
+  const tb = await page.locator('.react-flow__node[data-id="a4"]').boundingBox();
+  if (!hb || !tb) throw new Error('elementos não encontrados');
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 15 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const after = await count(page, '.react-flow__edge');
+  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
+});
+
+await check('resumo para IA inclui cenário e componentes', async () => {
   await page.getByRole('button', { name: 'Resumo para IA' }).click();
   const ta = page.locator('.modal textarea');
   await ta.waitFor();
   const t = await ta.inputValue();
-  for (const s of ['# Exercício de arquitetura: Encurtador de links', 'Serviço de links', 'Risco: o banco aguenta 5x?', '## Conexões']) {
-    if (!t.includes(s)) throw new Error(`faltou "${s}"`);
+  for (const x of ['# Exercício de arquitetura: Encurtador de links', 'Serviço de links', '## Conexões', 'Cache de redirecionamento → Banco de links']) {
+    if (!t.includes(x)) throw new Error(`faltou "${x}"`);
   }
   await page.screenshot({ path: `${OUT}/04-resumo.png` });
   await page.getByRole('button', { name: 'Fechar' }).click();
 });
 
+// ---------- quadro vazio (cenário livre) para criar elementos ----------
+await page.selectOption('#scenario', 'livre');
+await page.locator('.empty-hint').waitFor({ timeout: 5000 });
+
+await check('atalho C abre componentes e adiciona uma fila', async () => {
+  await page.keyboard.press('c');
+  await page.locator('.picker').waitFor({ timeout: 3000 });
+  await page.screenshot({ path: `${OUT}/02-paleta.png` });
+  await page.locator('.pick', { hasText: 'Fila' }).click();
+  await page.locator('.react-flow__node-component').first().waitFor({ timeout: 3000 });
+});
+
+await check('cria nota adesiva e escreve', async () => {
+  await page.keyboard.press('n');
+  await paneAt(0.25, 0.3);
+  const ta = page.locator('.n-note textarea');
+  await ta.waitFor({ timeout: 3000 });
+  await ta.type('Risco: o banco aguenta 5x?');
+  await page.keyboard.press('Escape');
+  await page.locator('.n-note', { hasText: 'Risco: o banco aguenta 5x?' }).waitFor({ timeout: 3000 });
+});
+
+await check('cria texto e área', async () => {
+  await page.keyboard.press('t');
+  await paneAt(0.25, 0.75);
+  await page.locator('.n-text textarea').waitFor({ timeout: 3000 });
+  await page.keyboard.type('Título do desenho');
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('f');
+  await paneAt(0.7, 0.35);
+  await page.locator('.frame-title input').waitFor({ timeout: 3000 });
+  await page.keyboard.press('End');
+  await page.keyboard.type(' de pedidos');
+  await page.keyboard.press('Enter');
+  if ((await count(page, '.react-flow__node-frame')) !== 1) throw new Error('área não criada');
+});
+
+await check('adiciona imagem pelo seletor de arquivo', async () => {
+  await page.setInputFiles('#image-input', { name: 'diagrama.png', mimeType: 'image/png', buffer: makePng() });
+  await page.locator('.n-image img').first().waitFor({ timeout: 5000 });
+});
+
+await check('desfazer e refazer pelo teclado', async () => {
+  await page.keyboard.press('Escape');
+  const before = await count(page, '.react-flow__node-image');
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(200);
+  const undone = await count(page, '.react-flow__node-image');
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(200);
+  const redone = await count(page, '.react-flow__node-image');
+  if (!(undone === before - 1 && redone === before)) {
+    const active = await page.evaluate(() => document.activeElement?.outerHTML.slice(0, 120));
+    throw new Error(`${before} -> ${undone} -> ${redone}; foco: ${active}`);
+  }
+});
+
+await check('duplicar com Ctrl+D', async () => {
+  await page.locator('.react-flow__node-component').first().click();
+  const before = await count(page, '.react-flow__node-component');
+  await page.keyboard.press('Control+d');
+  await page.waitForTimeout(200);
+  if ((await count(page, '.react-flow__node-component')) !== before + 1) throw new Error('não duplicou');
+});
+await page.keyboard.press('Escape');
+await page.locator('button[aria-label="Enquadrar tudo"]').click();
+await page.waitForTimeout(400);
+await page.screenshot({ path: `${OUT}/03-elementos-criados.png` });
+
+await check('resumo inclui anotações e áreas', async () => {
+  await page.getByRole('button', { name: 'Resumo para IA' }).click();
+  const t = await page.locator('.modal textarea').inputValue();
+  await page.getByRole('button', { name: 'Fechar' }).click();
+  for (const x of ['Risco: o banco aguenta 5x?', '## Áreas', 'Nova área de pedidos', 'imagem']) if (!t.includes(x)) throw new Error(`faltou "${x}"`);
+});
+
 await check('exporta PNG do quadro', async () => {
   await page.getByRole('button', { name: 'Arquivo' }).click();
   const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.getByRole('menuitem', { name: /Exportar imagem/ }).click()]);
-  const path = await dl.path();
-  if (!path) throw new Error('download vazio');
   await dl.saveAs(`${OUT}/05-export.png`);
 });
 
@@ -187,18 +212,17 @@ await check('quadro persiste após recarregar', async () => {
   const before = await count(page, '.react-flow__node');
   await page.waitForTimeout(900);
   await page.reload();
-  await page.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
+  await page.locator('.react-flow__node').first().waitFor({ timeout: 15000 });
   await page.waitForTimeout(400);
   const after = await count(page, '.react-flow__node');
   if (after !== before) throw new Error(`${before} -> ${after}`);
+  if ((await page.locator('#scenario').inputValue()) !== 'livre') throw new Error('cenário não foi lembrado');
 });
 
-await check('troca de cenário abre quadro vazio', async () => {
-  await page.selectOption('#scenario', 'delivery');
-  await page.locator('.empty-hint').waitFor({ timeout: 5000 });
-  await page.screenshot({ path: `${OUT}/07-cenario-vazio.png` });
+await check('volta ao encurtador com as edições anteriores', async () => {
   await page.selectOption('#scenario', 'encurtador');
-  await page.locator('.react-flow__node-component').first().waitFor();
+  await page.locator('.react-flow__node[data-id="a3"]').waitFor({ timeout: 5000 });
+  if ((await count(page, '.react-flow__edge')) !== 5) throw new Error(`conexões: ${await count(page, '.react-flow__edge')}`);
 });
 await ctx.close();
 

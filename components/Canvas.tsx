@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background, BackgroundVariant, ConnectionLineType, ConnectionMode, MarkerType, MiniMap, ReactFlow, SelectionMode,
-  useReactFlow, type OnNodeDrag, type OnSelectionChangeParams
+  useReactFlow, type OnConnectEnd, type OnNodeDrag, type OnSelectionChangeParams
 } from '@xyflow/react';
 import { CATALOG, groupOf, type ComponentKind } from '@/lib/catalog';
 import { uid } from '@/lib/boards';
@@ -97,12 +97,32 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   }, [anchor, notify]);
 
   const placeAt = useCallback((t: Tool, p: { x: number; y: number }) => {
+    useBoard.getState().setTool('select');
     const add = useBoard.getState().addNode;
     if (t === 'note') add({ id: 'n' + uid(), type: 'note', position: { x: p.x - 100, y: p.y - 80 }, width: 200, height: 160, data: { text: '', color: noteColor.current } }, { edit: true });
     if (t === 'text') add({ id: 't' + uid(), type: 'text', position: { x: p.x - 120, y: p.y - 20 }, width: 240, height: 44, data: { text: '', size: 'm' } }, { edit: true });
     if (t === 'frame') add({ id: 'f' + uid(), type: 'frame', position: { x: p.x - 260, y: p.y - 170 }, width: 520, height: 340, zIndex: -1, dragHandle: '.frame-drag', data: { title: 'Nova área', color: 'cinza' } }, { edit: true });
-    useBoard.getState().setTool('select');
   }, []);
+
+  /* soltar a conexão em cima de um elemento (não só na alça) também conecta, como no Miro */
+  const onConnectEnd = useCallback<OnConnectEnd>((event, state) => {
+    if (state.isValid || !state.fromNode) return;
+    const pt = 'changedTouches' in event ? event.changedTouches[0] : event;
+    if (!pt) return;
+    const el = document.elementFromPoint(pt.clientX, pt.clientY)?.closest('.react-flow__node');
+    const targetId = el?.getAttribute('data-id');
+    const from = state.fromNode;
+    if (!targetId || targetId === from.id) return;
+    const target = rf.getInternalNode(targetId);
+    if (!target || target.type === 'frame') return;
+    const center = (n: { internals: { positionAbsolute: { x: number; y: number } }; measured: { width?: number; height?: number } }) => ({
+      x: n.internals.positionAbsolute.x + (n.measured.width ?? 0) / 2, y: n.internals.positionAbsolute.y + (n.measured.height ?? 0) / 2
+    });
+    const a = center(from), b = center(target);
+    const dx = a.x - b.x, dy = a.y - b.y;
+    const side = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'r' : 'l') : (dy > 0 ? 'b' : 't');
+    useBoard.getState().onConnect({ source: from.id, sourceHandle: state.fromHandle?.id ?? null, target: targetId, targetHandle: side });
+  }, [rf]);
 
   /* ---------- teclado ---------- */
   useEffect(() => {
@@ -264,6 +284,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         connectionMode={ConnectionMode.Loose}
