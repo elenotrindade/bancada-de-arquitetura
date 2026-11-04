@@ -51,6 +51,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   const frameDrag = useRef<{ start: Map<string, { x: number; y: number }>; children: Map<string, { x: number; y: number; frame: string }> } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const noteColor = useRef('amarelo');
+  const clip = useRef<{ nodes: AppNode[]; edges: AppEdge[]; text: string } | null>(null);
 
   const rfEdges = useMemo(() => edges.map(e => ({ ...e, markerEnd: MARKER })), [edges]);
 
@@ -163,7 +164,10 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [rf]);
 
-  /* ---------- copiar, recortar, colar (inclusive imagens) ---------- */
+  /* ---------- copiar, recortar, colar ----------
+     Elementos copiados ficam só na memória desta aba. A área de transferência do sistema recebe
+     apenas um texto legível, e nada colado de fora vira elemento do quadro: texto vira nota,
+     imagem é recodificada. Assim não existe caminho para importar dados de terceiros. */
   useEffect(() => {
     const selected = () => {
       const s = useBoard.getState();
@@ -171,12 +175,20 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       const ids = new Set(ns.map(n => n.id));
       return { ns, es: s.edges.filter(e => ids.has(e.source) && ids.has(e.target)) };
     };
+    const describe = (ns: AppNode[]) => ns.map(n => {
+      if (n.type === 'component') return n.data.name;
+      if (n.type === 'note' || n.type === 'text') return n.data.text;
+      if (n.type === 'frame') return n.data.title;
+      return n.data.caption || 'imagem';
+    }).filter(Boolean).join('\n');
     const onCopy = (e: ClipboardEvent) => {
       if (isTyping(document.activeElement)) return;
       const { ns, es } = selected();
-      if (!ns.length || !e.clipboardData) return;
+      if (!ns.length) return;
       e.preventDefault();
-      e.clipboardData.setData('text/plain', JSON.stringify({ bancada: 1, nodes: ns, edges: es }));
+      const text = describe(ns) || 'elementos da Bancada';
+      clip.current = { nodes: structuredClone(ns), edges: structuredClone(es), text };
+      e.clipboardData?.setData('text/plain', text);
       notify(`${ns.length} ${ns.length === 1 ? 'elemento copiado' : 'elementos copiados'}`);
     };
     const onCut = (e: ClipboardEvent) => {
@@ -186,18 +198,20 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       if (ns.length) rf.deleteElements({ nodes: ns.map(n => ({ id: n.id })) });
     };
     const onPaste = (e: ClipboardEvent) => {
-      if (isTyping(document.activeElement) || !e.clipboardData) return;
-      const files = Array.from(e.clipboardData.files || []).filter(f => f.type.startsWith('image/'));
+      if (isTyping(document.activeElement)) return;
+      const files = Array.from(e.clipboardData?.files || []).filter(f => f.type.startsWith('image/'));
       if (files.length) { e.preventDefault(); addImages(files); return; }
-      const text = e.clipboardData.getData('text/plain');
-      if (!text) return;
+      const text = e.clipboardData?.getData('text/plain') ?? '';
+      const c = clip.current;
+      if (c && (text === c.text || !text)) {
+        e.preventDefault();
+        useBoard.getState().pasteElements(c.nodes, c.edges, anchor());
+        return;
+      }
+      if (!text.trim()) return;
       e.preventDefault();
-      try {
-        const j = JSON.parse(text);
-        if (j && j.bancada === 1 && Array.isArray(j.nodes)) { useBoard.getState().pasteElements(j.nodes, j.edges || [], anchor()); return; }
-      } catch { /* texto comum */ }
       const p = anchor();
-      useBoard.getState().addNode({ id: 'n' + uid(), type: 'note', position: { x: p.x - 100, y: p.y - 80 }, width: 220, height: 160, data: { text: text.slice(0, 2000), color: noteColor.current } });
+      useBoard.getState().addNode({ id: 'n' + uid(), type: 'note', position: { x: p.x - 110, y: p.y - 80 }, width: 220, height: 160, data: { text: text.slice(0, 2000), color: noteColor.current } });
     };
     document.addEventListener('copy', onCopy);
     document.addEventListener('cut', onCut);
@@ -360,7 +374,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       <ZoomBar prefs={prefs} setPrefs={setPrefs} />
       <CommOptions />
       <input
-        ref={fileRef} type="file" accept="image/*" multiple hidden id="image-input" aria-label="Adicionar imagem"
+        ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden id="image-input" aria-label="Adicionar imagem"
         onChange={e => { addImages(Array.from(e.target.files || [])); e.target.value = ''; }}
       />
     </div>

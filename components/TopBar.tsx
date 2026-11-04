@@ -1,12 +1,10 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import { cleanEdges, cleanNodes } from '@/lib/boards';
 import { boardImage, download, downloadText } from '@/lib/exportImage';
 import { SCENARIOS, scenarioById } from '@/lib/scenarios';
 import { useBoard } from '@/lib/store';
 import { buildSummary } from '@/lib/summary';
-import type { AppEdge, AppNode } from '@/lib/types';
 import { IconPanel } from './Icons';
 
 type Props = { scenario: string; onScenario: (id: string) => void; notify: (m: string) => void };
@@ -23,7 +21,6 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
   const [summary, setSummary] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const [copyStatus, setCopyStatus] = useState('');
-  const importRef = useRef<HTMLInputElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,32 +52,9 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
     catch (e) { notify((e as Error).message); }
   };
 
-  const exportJson = () => {
-    setMenu(false);
-    const s = useBoard.getState();
-    const data = { app: 'bancada-de-arquitetura', version: 1, scenario: s.id, nodes: cleanNodes(s.nodes), edges: cleanEdges(s.edges), adrs: s.adrs, checks: s.checks, twist: s.twist, custom: s.custom };
-    downloadText(JSON.stringify(data, null, 2), `${name()}.json`);
-    notify('Arquivo do quadro exportado');
-  };
-
   const exportMd = () => {
     setMenu(false);
-    downloadText(buildSummary(useBoard.getState(), { withPrompt: false }), `${name()}.md`, 'text/markdown');
-  };
-
-  const importJson = async (file: File) => {
-    try {
-      const j = JSON.parse(await file.text());
-      if (j?.app !== 'bancada-de-arquitetura' || !Array.isArray(j.nodes)) throw new Error('Este arquivo não é um quadro da Bancada.');
-      useBoard.getState().replaceBoard({
-        nodes: j.nodes as AppNode[], edges: (j.edges ?? []) as AppEdge[], adrs: j.adrs ?? [], checks: j.checks ?? {},
-        twist: !!j.twist, custom: { ...useBoard.getState().custom, ...(j.custom ?? {}) }, sample: false
-      });
-      setTimeout(() => rf.fitView({ padding: 0.2, duration: 250 }), 50);
-      notify('Quadro importado. Ctrl+Z desfaz.');
-    } catch (e) {
-      notify((e as Error).message.startsWith('Este') ? (e as Error).message : 'Não foi possível ler o arquivo.');
-    }
+    downloadText(buildSummary(useBoard.getState(), { withPrompt: true }), `${name()}.md`, 'text/markdown');
   };
 
   return (
@@ -100,9 +74,7 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
           {menu && (
             <div className="menu" role="menu">
               <button type="button" role="menuitem" onClick={exportPng}>Exportar imagem (PNG)<small>O quadro inteiro, não só a parte visível</small></button>
-              <button type="button" role="menuitem" onClick={exportJson}>Exportar quadro (JSON)<small>Para guardar ou abrir em outro navegador</small></button>
-              <button type="button" role="menuitem" onClick={exportMd}>Exportar resumo (Markdown)</button>
-              <button type="button" role="menuitem" onClick={() => { setMenu(false); importRef.current?.click(); }}>Importar quadro (JSON)<small>Substitui o quadro deste cenário</small></button>
+              <button type="button" role="menuitem" onClick={exportMd}>Exportar resumo (Markdown)<small>O mesmo texto do Resumo para IA, em arquivo</small></button>
               <div className="sep" />
               {confirmClear
                 ? <button type="button" role="menuitem" className="btn danger" onClick={() => { useBoard.getState().clearBoard(); setConfirmClear(false); setMenu(false); notify('Quadro limpo. Ctrl+Z desfaz.'); }}>Confirmar: limpar o quadro</button>
@@ -112,7 +84,6 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
         </div>
         {!sidebarOpen && <button type="button" className="btn" onClick={() => setSidebarOpen(true)}><IconPanel width={16} height={16} />Painel</button>}
       </div>
-      <input ref={importRef} type="file" accept="application/json,.json" hidden id="import-input" onChange={e => { const f = e.target.files?.[0]; if (f) importJson(f); e.target.value = ''; }} />
 
       {summary !== null && (
         <div className="modal-back" onClick={e => { if (e.target === e.currentTarget) setSummary(null); }}>

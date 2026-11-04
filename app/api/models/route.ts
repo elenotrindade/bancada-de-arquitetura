@@ -1,4 +1,4 @@
-import { friendlyError, jsonError } from '@/lib/llm';
+import { friendlyError, jsonError, rejectForeign } from '@/lib/llm';
 import { isProvider } from '@/lib/providers';
 
 export const runtime = 'nodejs';
@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 const SKIP = /(audio|realtime|transcribe|tts|image|dall-e|search|embedding|moderation|instruct|whisper|davinci|babbage|codex)/i;
 
 export async function POST(req: Request) {
+  const refused = rejectForeign(req);
+  if (refused) return refused;
   let body: any;
   try { body = await req.json(); } catch { return jsonError(400, 'Requisição inválida.'); }
   const { provider, apiKey } = body ?? {};

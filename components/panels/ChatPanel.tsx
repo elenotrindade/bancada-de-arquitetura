@@ -5,12 +5,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { uid } from '@/lib/boards';
 import { boardImage } from '@/lib/exportImage';
-import { forgetKeys, loadAi, loadKey, saveAi, saveKey, type AiPrefs } from '@/lib/prefs';
+import { getKey, hasVault, purgeLegacyKeys } from '@/lib/keyVault';
+import { loadAi, saveAi, type AiPrefs } from '@/lib/prefs';
 import { PROVIDERS, SYSTEM_PROMPT, type ProviderId } from '@/lib/providers';
 import { useBoard } from '@/lib/store';
 import { buildSummary } from '@/lib/summary';
 import type { ChatMsg } from '@/lib/types';
 import { IconSend } from '../Icons';
+import KeySettings, { initialVaultState, type VaultState } from './KeySettings';
 
 const QUICK = [
   'Revise meu desenho',
@@ -24,9 +26,9 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
   const chat = useBoard(s => s.chat);
   const setChat = useBoard(s => s.setChat);
   const rf = useReactFlow();
-  const [ai, setAiState] = useState<AiPrefs>({ provider: 'anthropic', models: {}, remember: true, attach: false });
+  const [ai, setAiState] = useState<AiPrefs>({ provider: 'anthropic', models: {}, attach: false });
   const [key, setKey] = useState('');
-  const [showKey, setShowKey] = useState(false);
+  const [vault, setVault] = useState<VaultState>('none');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -37,11 +39,13 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    purgeLegacyKeys();
     const a = loadAi();
     setAiState(a);
-    const k = loadKey(a.provider);
+    const k = getKey(a.provider);
     setKey(k);
     setSettingsOpen(!k);
+    initialVaultState(hasVault).then(setVault);
   }, []);
 
   const provider = ai.provider;
@@ -50,7 +54,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
 
   const changeProvider = (p: ProviderId) => {
     setAi({ provider: p });
-    const k = loadKey(p);
+    const k = getKey(p);
     setKey(k);
     setModelOptions([]);
     if (!k) setSettingsOpen(true);
@@ -75,7 +79,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
   const send = async (text: string) => {
     const t = text.trim();
     if (!t || busy) return;
-    if (!key) { setSettingsOpen(true); notify('Informe a chave de API do provedor para conversar.'); return; }
+    if (!key) { setSettingsOpen(true); notify(vault === 'locked' ? 'Desbloqueie o cofre para usar a chave salva.' : 'Informe a chave de API do provedor para conversar.'); return; }
     const s = useBoard.getState();
     let image: string | undefined;
     if (ai.attach && s.nodes.length) {
@@ -132,7 +136,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
       <details className="chat-settings" open={settingsOpen} onToggle={e => setSettingsOpen((e.target as HTMLDetailsElement).open)}>
         <summary>
           <span className={`status-dot${configured ? ' ok' : ''}`} aria-hidden />
-          <span>{configured ? `${p.label} · ${model}` : 'Configurar a IA'}</span>
+          <span>{configured ? `${p.label} · ${model}` : vault === 'locked' ? 'Cofre bloqueado' : 'Configurar a IA'}</span>
           <span className="spacer" />
           <span className="muted small">{settingsOpen ? 'Fechar' : 'Alterar'}</span>
         </summary>
@@ -141,20 +145,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
             {(Object.keys(PROVIDERS) as ProviderId[]).map(id => <option key={id} value={id}>{PROVIDERS[id].label}</option>)}
           </select>
         </label>
-        <div className="field">
-          <span>Chave de API (<a href={p.keyUrl} target="_blank" rel="noreferrer">gerar uma</a>)</span>
-          <div className="key-row">
-            <input
-              type={showKey ? 'text' : 'password'} id="ai-key" autoComplete="off" spellCheck={false} placeholder={p.keyHint} value={key}
-              onChange={e => { setKey(e.target.value); saveKey(provider, e.target.value.trim(), ai.remember); }}
-            />
-            <button type="button" className="btn small" onClick={() => setShowKey(v => !v)}>{showKey ? 'Ocultar' : 'Mostrar'}</button>
-          </div>
-        </div>
-        <label className="row small" style={{ cursor: 'pointer' }}>
-          <input type="checkbox" id="ai-remember" checked={ai.remember} onChange={e => { setAi({ remember: e.target.checked }); saveKey(provider, key.trim(), e.target.checked); }} />
-          Lembrar a chave neste navegador
-        </label>
+        <KeySettings provider={provider} vault={vault} setVault={setVault} keyValue={key} setKeyValue={setKey} notify={notify} />
         <div className="field">
           <span>Modelo</span>
           <div className="key-row">
@@ -163,10 +154,6 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
           </div>
           <datalist id="ai-models">{(modelOptions.length ? modelOptions : p.suggestions).map(m => <option key={m} value={m} />)}</datalist>
         </div>
-        <p className="muted small" style={{ margin: 0 }}>
-          A chave fica só neste navegador e é enviada ao provedor a cada mensagem, passando pelo servidor deste app sem ser guardada. O uso é cobrado na sua conta do provedor.
-          {' '}<button type="button" className="btn small ghost" onClick={() => { forgetKeys(); setKey(''); notify('Chaves apagadas deste navegador'); }}>Apagar chaves salvas</button>
-        </p>
       </details>
 
       <div className="chat-log" ref={logRef} aria-live="polite">
@@ -180,7 +167,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
           <div key={m.id} className={`msg ${m.role}${m.error ? ' error' : ''}`}>
             {m.role === 'assistant' && !m.error
               ? (m.content
-                ? <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => { void node; return <a {...props} target="_blank" rel="noreferrer" />; } }}>{m.content}</ReactMarkdown></div>
+                ? <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => { void node; return <a {...props} target="_blank" rel="noopener noreferrer nofollow" />; } }}>{m.content}</ReactMarkdown></div>
                 : <span className="typing">Pensando…</span>)
               : m.content}
             {m.withImage && <span className="attach">imagem do quadro anexada</span>}

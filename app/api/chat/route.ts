@@ -1,4 +1,4 @@
-import { buildRequest, friendlyError, jsonError, normalize, sseToText, type InMsg } from '@/lib/llm';
+import { buildRequest, friendlyError, jsonError, rejectForeign, normalize, sseToText, type InMsg } from '@/lib/llm';
 import { isProvider } from '@/lib/providers';
 
 export const runtime = 'nodejs';
@@ -10,6 +10,8 @@ const MAX_CHARS = 200_000;
 const MAX_IMAGE = 4_000_000;
 
 export async function POST(req: Request) {
+  const refused = rejectForeign(req);
+  if (refused) return refused;
   let body: any;
   try { body = await req.json(); } catch { return jsonError(400, 'Requisição inválida.'); }
 

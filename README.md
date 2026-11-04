@@ -10,9 +10,9 @@ Simulador para praticar arquitetura de software sem depender do código de nenhu
 - **Decisões (ADRs)** e **perguntas de arquiteto** para autoavaliação.
 - **IA integrada**: escolha Anthropic (Claude), OpenAI (GPT) ou Google (Gemini), cole a sua chave e converse. O resumo do quadro vai junto em toda mensagem; dá para anexar uma imagem do quadro.
 - **Resumo para qualquer IA**: um botão gera o texto do exercício para colar em qualquer chat.
-- **Arquivo**: exportar PNG do quadro inteiro, JSON (para guardar ou levar a outro navegador), Markdown, e importar JSON.
+- **Arquivo**: exportar o quadro inteiro em PNG e o resumo em Markdown. O app só produz saídas: não importa arquivos de quadro.
 
-Os quadros ficam salvos no navegador (IndexedDB), um por cenário.
+Os quadros ficam salvos no navegador (IndexedDB), um por cenário, e são validados sempre que abertos.
 
 ## Publicar na Vercel
 
@@ -30,11 +30,31 @@ npm run dev
 
 Outros comandos: `npm run build`, `npm run typecheck`, `npm run smoke` (teste de ponta a ponta com Playwright contra o app rodando em `localhost:3000`).
 
-## Como funciona a chave da IA
+## Segurança
 
-Cada pessoa usa a própria chave. Ela fica guardada só no navegador de quem usa (ou só na aba, se desmarcar "Lembrar") e vai a cada mensagem para a rota `/api/chat` deste app, que repassa ao provedor e devolve a resposta em streaming. O servidor não guarda nem registra a chave. O custo de uso é cobrado na conta do provedor de quem colou a chave.
+**Chave de API.** Cada pessoa usa a própria chave, e ela nunca fica em texto puro no navegador:
 
-Os modelos sugeridos podem ficar desatualizados; o botão **Buscar modelos** lista os modelos disponíveis na conta da pessoa.
+- Sem salvar, ela existe só na memória da aba e some ao recarregar.
+- Salva, ela fica num cofre no IndexedDB, cifrada com AES-GCM 256 usando uma chave derivada da senha da pessoa (PBKDF2-SHA256, 600 mil iterações, sal aleatório). Sem a senha, ninguém lê, nem quem copiar os dados do navegador. A cada visita a senha é pedida de novo.
+- Nada vai para localStorage ou sessionStorage; chaves gravadas lá por versões antigas são apagadas automaticamente.
+- A chave passa pela rota `/api/chat` só para chegar ao provedor. O servidor não grava nem registra a chave.
+
+**Proteções na página.**
+
+- Content Security Policy com nonce por requisição (`proxy.ts`): só rodam os scripts do próprio app, e `connect-src 'self'` impede que a página envie dados para qualquer outro endereço.
+- Nada de fora vira elemento do quadro: não há importação de arquivo, o copiar e colar entre elementos fica na memória da aba, texto colado vira nota e imagens são sempre redesenhadas num canvas (o que descarta metadados como GPS e bloqueia SVG).
+- Quadros lidos do armazenamento passam por validação: só tipos e campos conhecidos, imagens apenas como dados embutidos.
+- A IA recebe a instrução de tratar o conteúdo do quadro como dado, nunca como ordem, e de nunca pedir chaves ou dados pessoais.
+- Cabeçalhos: X-Frame-Options, HSTS, Permissions-Policy, Referrer-Policy, COOP e CORP.
+
+**Rotas de servidor.** `/api/chat` e `/api/models` só aceitam requisições JSON vindas da própria página (Origin e Sec-Fetch-Site), com limites de tamanho. Scripts fora do navegador podem forjar cabeçalhos, então configure também um limite de requisições na Vercel:
+
+1. No projeto, abra **Firewall** › **Configure** › **New Rule**.
+2. Condição: *Request Path* começa com `/api/`.
+3. Ação: **Rate Limit**, janela fixa de 60 s, 20 requisições por IP, resposta 429.
+4. Salve e publique com **Review Changes** › **Publish**.
+
+O plano Hobby permite uma regra de limite de requisições por projeto.
 
 ## Atalhos
 

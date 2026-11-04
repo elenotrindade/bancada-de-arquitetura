@@ -8,6 +8,25 @@ export function jsonError(status: number, error: string) {
   return new Response(JSON.stringify({ error }), { status, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' } });
 }
 
+/**
+ * Aceita só requisições feitas pela própria página do app: Origin igual ao host,
+ * Sec-Fetch-Site same-origin (quando o navegador envia) e corpo JSON.
+ * Impede que outros sites usem estas rotas pelo navegador de um visitante.
+ * Scripts fora do navegador podem forjar cabeçalhos; para eles vale o limite de requisições do Firewall da Vercel.
+ */
+export function rejectForeign(req: Request): Response | null {
+  const origin = req.headers.get('origin');
+  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host');
+  let sameHost = false;
+  try { sameHost = !!origin && !!host && new URL(origin).host === host; } catch { sameHost = false; }
+  const site = req.headers.get('sec-fetch-site');
+  if (!sameHost || (site && site !== 'same-origin')) return jsonError(403, 'Requisição recusada: use o app pelo próprio site.');
+  if (!(req.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return jsonError(415, 'Tipo de conteúdo inválido.');
+  const len = Number(req.headers.get('content-length') || 0);
+  if (len > 4_500_000) return jsonError(413, 'Requisição grande demais.');
+  return null;
+}
+
 export function friendlyError(status: number, raw: string): string {
   let detail = '';
   try {

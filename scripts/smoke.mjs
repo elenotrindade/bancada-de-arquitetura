@@ -53,9 +53,28 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
-page.on('console', m => { if (m.type() === 'error' && !/favicon|status of 401/.test(m.text())) errors.push(`console: ${m.text()}`); });
+let expectCspBlock = false;
+page.on('console', m => {
+  if (m.type() !== 'error') return;
+  const t = m.text();
+  if (/favicon|status of 401/.test(t)) return;
+  if (expectCspBlock && /Content Security Policy|Failed to load resource/.test(t)) return;
+  errors.push(`console: ${t}`);
+});
 
-await page.goto(BASE);
+const first = await page.goto(BASE);
+await check('cabeçalhos de segurança e CSP com nonce', async () => {
+  const h = first.headers();
+  const csp = h['content-security-policy'] || '';
+  for (const x of ["'nonce-", "'strict-dynamic'", "connect-src 'self'", "frame-ancestors 'none'", "object-src 'none'"]) {
+    if (!csp.includes(x)) throw new Error(`CSP sem ${x}: ${csp.slice(0, 160)}`);
+  }
+  if (h['x-frame-options'] !== 'DENY') throw new Error('sem X-Frame-Options');
+  if (!h['permissions-policy']) throw new Error('sem Permissions-Policy');
+  const second = await page.request.get(BASE);
+  const nonceA = /'nonce-([^']+)'/.exec(csp)?.[1], nonceB = /'nonce-([^']+)'/.exec(second.headers()['content-security-policy'] || '')?.[1];
+  if (!nonceA || nonceA === nonceB) throw new Error('nonce não muda a cada requisição');
+});
 await check('quadro de exemplo carrega', async () => {
   await page.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
   const n = await count(page, '.react-flow__node-component');
@@ -172,6 +191,44 @@ await check('duplicar com Ctrl+D', async () => {
   await page.waitForTimeout(200);
   if ((await count(page, '.react-flow__node-component')) !== before + 1) throw new Error('não duplicou');
 });
+await check('copiar e colar elementos dentro do app', async () => {
+  await page.locator('.react-flow__node-component').first().click();
+  const before = await count(page, '.react-flow__node-component');
+  await page.keyboard.press('Control+c');
+  await paneAt(0.5, 0.85);
+  await page.keyboard.press('Control+v');
+  await page.waitForTimeout(250);
+  const after = await count(page, '.react-flow__node-component');
+  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
+});
+
+await check('JSON colado de fora vira nota de texto, nunca elementos', async () => {
+  const comps = await count(page, '.react-flow__node-component');
+  const notes = await count(page, '.react-flow__node-note');
+  const imgs = await count(page, '.react-flow__node-image');
+  await page.evaluate(() => navigator.clipboard.writeText(JSON.stringify({
+    bancada: 1, nodes: [{ id: 'x1', type: 'image', position: { x: 0, y: 0 }, data: { src: 'https://evil.example/p.png' } }], edges: []
+  })));
+  await paneAt(0.5, 0.85);
+  await page.keyboard.press('Control+v');
+  await page.waitForTimeout(250);
+  if ((await count(page, '.react-flow__node-note')) !== notes + 1) throw new Error('não virou nota');
+  if ((await count(page, '.react-flow__node-component')) !== comps || (await count(page, '.react-flow__node-image')) !== imgs) throw new Error('JSON externo virou elemento');
+});
+
+await check('CSP bloqueia script injetado na página', async () => {
+  expectCspBlock = true;
+  await page.evaluate(() => {
+    const d = document.createElement('div');
+    d.innerHTML = '<img src="data:," onerror="window.__xss = 1">';
+    document.body.appendChild(d);
+  });
+  await page.waitForTimeout(400);
+  const ran = await page.evaluate(() => (window).__xss === 1);
+  expectCspBlock = false;
+  if (ran) throw new Error('script inline executou');
+});
+
 await page.keyboard.press('Escape');
 await page.locator('button[aria-label="Enquadrar tudo"]').click();
 await page.waitForTimeout(400);
@@ -203,9 +260,61 @@ await check('chat de IA mostra erro amigável com chave inválida', async () => 
   await page.screenshot({ path: `${OUT}/06-chat-erro.png` });
 });
 
-await check('rota /api/models valida o provedor', async () => {
-  const r = await page.request.post(`${BASE}/api/models`, { data: { provider: 'xpto', apiKey: '12345678' } });
-  if (r.status() !== 400) throw new Error(`status ${r.status()}`);
+await check('cofre: chave fica só cifrada e pede senha ao recarregar', async () => {
+  const KEY = 'sk-ant-teste-cofre-1234567890';
+  await page.fill('#ai-key', KEY);
+  await page.check('#ai-remember');
+  await page.fill('#ai-pass', 'curta');
+  await page.getByRole('button', { name: 'Salvar protegida' }).click();
+  await page.getByText('pelo menos 8 caracteres').first().waitFor({ timeout: 3000 });
+  await page.fill('#ai-pass', 'senha-forte-123');
+  await page.getByRole('button', { name: 'Salvar protegida' }).click();
+  await page.getByRole('button', { name: 'Bloquear agora' }).waitFor({ timeout: 15000 });
+  const dump = await page.evaluate(async () => {
+    const readDb = name => new Promise(resolve => {
+      const r = indexedDB.open(name);
+      r.onerror = () => resolve('');
+      r.onsuccess = () => {
+        const db = r.result;
+        const names = Array.from(db.objectStoreNames);
+        if (!names.length) { db.close(); resolve(''); return; }
+        const tx = db.transaction(names, 'readonly');
+        const out = [];
+        let pending = names.length;
+        names.forEach(n => {
+          const g = tx.objectStore(n).getAll();
+          g.onsuccess = () => { out.push(JSON.stringify(g.result)); if (--pending === 0) { db.close(); resolve(out.join('')); } };
+          g.onerror = () => { if (--pending === 0) { db.close(); resolve(out.join('')); } };
+        });
+      };
+    });
+    const dbs = await indexedDB.databases();
+    let idb = '';
+    for (const d of dbs) if (d.name) idb += await readDb(d.name);
+    return { web: JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }), idb };
+  });
+  if (/sk-ant/.test(dump.web + dump.idb)) throw new Error('chave em texto puro no armazenamento do navegador');
+  if (!dump.idb.includes('"iv"')) throw new Error('cofre cifrado não encontrado');
+  await page.reload();
+  await page.locator('#tab-ia').click();
+  await page.locator('#ai-unlock-pass').waitFor({ timeout: 10000 });
+  await page.fill('#ai-unlock-pass', 'senha-errada-000');
+  await page.getByRole('button', { name: 'Desbloquear' }).click();
+  await page.getByText('Senha incorreta.').waitFor({ timeout: 15000 });
+  await page.fill('#ai-unlock-pass', 'senha-forte-123');
+  await page.getByRole('button', { name: 'Desbloquear' }).click();
+  await page.locator('#ai-key').waitFor({ timeout: 15000 });
+  if ((await page.inputValue('#ai-key')) !== KEY) throw new Error('chave não voltou após desbloquear');
+  await page.screenshot({ path: `${OUT}/07-cofre.png` });
+});
+
+await check('rotas de IA recusam chamadas de fora do site', async () => {
+  const semOrigem = await page.request.post(`${BASE}/api/models`, { data: { provider: 'anthropic', apiKey: '12345678' } });
+  if (semOrigem.status() !== 403) throw new Error(`sem Origin: ${semOrigem.status()}`);
+  const outroSite = await page.request.post(`${BASE}/api/chat`, { data: { provider: 'anthropic' }, headers: { origin: 'https://evil.example' } });
+  if (outroSite.status() !== 403) throw new Error(`outro site: ${outroSite.status()}`);
+  const proprio = await page.request.post(`${BASE}/api/models`, { data: { provider: 'xpto', apiKey: '12345678' }, headers: { origin: BASE } });
+  if (proprio.status() !== 400) throw new Error(`mesmo site com provedor inválido: ${proprio.status()}`);
 });
 
 await check('quadro persiste após recarregar', async () => {
@@ -223,6 +332,33 @@ await check('volta ao encurtador com as edições anteriores', async () => {
   await page.selectOption('#scenario', 'encurtador');
   await page.locator('.react-flow__node[data-id="a3"]').waitFor({ timeout: 5000 });
   if ((await count(page, '.react-flow__edge')) !== 5) throw new Error(`conexões: ${await count(page, '.react-flow__edge')}`);
+});
+
+await check('quadro salvo adulterado é limpo ao abrir', async () => {
+  await page.evaluate(() => new Promise((resolve, reject) => {
+    const r = indexedDB.open('keyval-store');
+    r.onerror = () => reject(r.error);
+    r.onsuccess = () => {
+      const tx = r.result.transaction('keyval', 'readwrite');
+      tx.objectStore('keyval').put({
+        nodes: [
+          { id: 'm1', type: 'image', position: { x: 0, y: 0 }, width: 200, height: 100, data: { src: 'https://evil.example/pixel.png', caption: 'rastreio' } },
+          { id: 'm2', type: 'note', position: { x: 300, y: 0 }, width: 200, height: 120, style: { position: 'fixed', inset: '0', zIndex: 9999 }, className: 'falso', data: { text: 'nota legítima', color: 'amarelo' } },
+          { id: 'm3', type: 'script', position: { x: 0, y: 300 }, data: {} }
+        ],
+        edges: [{ id: 'z', source: 'm2', target: 'nao-existe' }]
+      }, 'board:ingressos');
+      tx.oncomplete = () => { r.result.close(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    };
+  }));
+  await page.selectOption('#scenario', 'ingressos');
+  await page.locator('.n-note', { hasText: 'nota legítima' }).waitFor({ timeout: 5000 });
+  if (await count(page, '.react-flow__node-image')) throw new Error('imagem externa foi carregada');
+  if (await count(page, '.react-flow__node[data-id="m3"]')) throw new Error('tipo desconhecido foi aceito');
+  const style = (await page.locator('.react-flow__node[data-id="m2"]').getAttribute('style')) || '';
+  const cls = (await page.locator('.react-flow__node[data-id="m2"]').getAttribute('class')) || '';
+  if (/fixed|9999/.test(style) || /falso/.test(cls)) throw new Error('estilo injetado foi aplicado');
 });
 await ctx.close();
 
