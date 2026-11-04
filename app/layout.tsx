@@ -1,4 +1,6 @@
 import type { Metadata, Viewport } from 'next';
+import { Analytics } from '@vercel/analytics/next';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Bricolage_Grotesque, IBM_Plex_Mono, IBM_Plex_Sans } from 'next/font/google';
 import '@xyflow/react/dist/style.css';
 import './globals.css';
@@ -25,7 +27,12 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body>{children}</body>
+      <body>
+        {children}
+        {/* Telemetria sem cookies, no mesmo domínio: só visitas e desempenho, nunca o conteúdo do quadro ou do chat. */}
+        <Analytics />
+        <SpeedInsights />
+      </body>
     </html>
   );
 }

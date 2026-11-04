@@ -58,6 +58,8 @@ page.on('console', m => {
   if (m.type() !== 'error') return;
   const t = m.text();
   if (/favicon|status of 401/.test(t)) return;
+  // Scripts da telemetria só existem quando o app roda na Vercel.
+  if (/\/_vercel\//.test(m.location()?.url || '') || /_vercel/.test(t)) return;
   if (expectCspBlock && /Content Security Policy|Failed to load resource/.test(t)) return;
   errors.push(`console: ${t}`);
 });

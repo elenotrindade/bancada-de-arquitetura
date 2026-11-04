@@ -11,6 +11,8 @@
     "smoke": "node scripts/smoke.mjs"
   },
   "dependencies": {
+    "@vercel/analytics": "^1.5.0",
+    "@vercel/speed-insights": "^1.2.0",
     "@xyflow/react": "^12.8.0",
     "html-to-image": "1.11.11",
     "idb-keyval": "^6.2.1",

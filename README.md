@@ -20,6 +20,10 @@ Os quadros ficam salvos no navegador (IndexedDB), um por cenário, e são valida
 2. A Vercel detecta Next.js sozinha. Não precisa de variável de ambiente.
 3. Clique em **Deploy**. A cada push na `main`, uma nova versão sobe.
 
+## Telemetria
+
+O app usa Vercel Web Analytics e Speed Insights, que não usam cookies e rodam no próprio domínio. Eles registram só visitas, páginas, país, dispositivo e desempenho; nada do quadro, do chat ou das chaves sai da página. Para ativar, abra o projeto na Vercel e ligue **Analytics** e **Speed Insights**. No plano Hobby: 50 mil eventos de Analytics por mês e 10 mil de Speed Insights a cada 30 dias.
+
 ## Rodar localmente
 
 ```bash
