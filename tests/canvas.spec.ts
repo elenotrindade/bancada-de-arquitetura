@@ -42,7 +42,9 @@ test.describe('Componentes de arquitetura', () => {
     await page.fill('#i-tech', 'Go');
     await page.fill('#i-resp', 'Resolve o código curto');
     await expect(app.no('a3').locator('.n-tech')).toHaveText('Go');
-    expect(await app.resumo()).toContain('**Serviço de links** (Serviço / API, Go): Resolve o código curto');
+    const r = await app.resumo();
+    expect(r).toContain('- **Serviço de links** (Serviço / API, Go)');
+    expect(r).toContain('  - Responsabilidade: Resolve o código curto');
   });
 });
 
