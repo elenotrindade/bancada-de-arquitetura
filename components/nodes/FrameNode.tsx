@@ -10,28 +10,25 @@ import NodeActions from './NodeActions';
  * selecionar em caixa e mexer nos componentes dentro dela. Arraste pelo título ou pela borda.
  */
 function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
-  const snapshot = useBoard(s => s.snapshot);
   const editing = useBoard(s => s.editingId === id);
-  const setEditing = useBoard(s => s.setEditing);
-  const updateNodeData = useBoard(s => s.updateNodeData);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (editing && ref.current) { snapshot(); ref.current.focus(); ref.current.select(); }
-  }, [editing, snapshot]);
+    if (editing && ref.current) { useBoard.getState().snapshot(); ref.current.focus(); ref.current.select(); }
+  }, [editing]);
 
   return (
     <>
-      <NodeActions id={id} selected={!!selected} colors="frame" color={data.color} />
-      <NodeResizer isVisible={!!selected} minWidth={200} minHeight={120} onResizeStart={snapshot} />
+      {selected && <NodeActions id={id} colors="frame" color={data.color} />}
+      <NodeResizer isVisible={!!selected} minWidth={200} minHeight={120} onResizeStart={() => useBoard.getState().snapshot()} />
       <div className="n-frame" style={{ ['--fc' as string]: `var(--frame-${data.color})`, ['--fl' as string]: `var(--frame-line-${data.color})` }}>
-        <div className="frame-title frame-drag" onDoubleClick={() => setEditing(id)}>
+        <div className="frame-title frame-drag" onDoubleClick={() => useBoard.getState().setEditing(id)}>
           {editing ? (
             <input
               ref={ref} type="text" className="nodrag" defaultValue={data.title} aria-label="Título da área"
-              onChange={e => updateNodeData(id, { title: e.target.value })}
-              onBlur={() => setEditing(null)}
-              onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') setEditing(null); }}
+              onChange={e => useBoard.getState().updateNodeData(id, { title: e.target.value })}
+              onBlur={() => useBoard.getState().setEditing(null)}
+              onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') useBoard.getState().setEditing(null); }}
             />
           ) : (data.title || 'Área sem título')}
         </div>

@@ -11,7 +11,7 @@ function ComponentNode({ id, data, selected }: NodeProps<ComponentNodeT>) {
   const g = groupOf(data.kind);
   return (
     <>
-      <NodeActions id={id} selected={!!selected} />
+      {selected && <NodeActions id={id} />}
       <div className="n-comp" style={{ ['--gc' as string]: g.color }}>
         <div className="n-head"><span className="chip">{c.abbr}</span><span className="n-type">{c.label}</span></div>
         <div className="n-name">{data.name || c.label}</div>

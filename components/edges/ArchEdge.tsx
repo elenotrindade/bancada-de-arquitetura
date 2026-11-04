@@ -15,14 +15,11 @@ function ArchEdge(p: EdgeProps<AppEdge>) {
         : getSmoothStepPath({ ...args, borderRadius: 10 });
 
   const editing = useBoard(s => s.editingId === id);
-  const setEditing = useBoard(s => s.setEditing);
-  const updateEdgeData = useBoard(s => s.updateEdgeData);
-  const snapshot = useBoard(s => s.snapshot);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (editing && ref.current) { snapshot(); ref.current.focus(); ref.current.select(); }
-  }, [editing, snapshot]);
+    if (editing && ref.current) { useBoard.getState().snapshot(); ref.current.focus(); ref.current.select(); }
+  }, [editing]);
 
   const label = data?.label ?? '';
   const text = label + (data?.async ? ' · assíncrona' : '');
@@ -35,17 +32,17 @@ function ArchEdge(p: EdgeProps<AppEdge>) {
           <div
             className={`edge-label nodrag nopan${selected ? ' selected' : ''}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
-            onDoubleClick={() => setEditing(id)}
+            onDoubleClick={() => useBoard.getState().setEditing(id)}
           >
             {editing ? (
               <input
                 ref={ref} type="text" list="comm-options" defaultValue={label} aria-label="Como se comunicam"
                 onChange={e => {
                   const v = e.target.value;
-                  updateEdgeData(id, isAsyncLabel(v) && !data?.async ? { label: v, async: true } : { label: v });
+                  useBoard.getState().updateEdgeData(id, isAsyncLabel(v) && !data?.async ? { label: v, async: true } : { label: v });
                 }}
-                onBlur={() => setEditing(null)}
-                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') setEditing(null); }}
+                onBlur={() => useBoard.getState().setEditing(null)}
+                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') useBoard.getState().setEditing(null); }}
               />
             ) : text}
           </div>

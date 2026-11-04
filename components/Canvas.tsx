@@ -25,6 +25,26 @@ const edgeTypes = { arch: ArchEdge };
 const MARKER = { type: MarkerType.ArrowClosed, width: 18, height: 18, color: '#7E8D94' };
 const DRAG_MIME = 'application/x-bancada-component';
 
+/* Props constantes fora do componente: arrays e funções novas a cada render fariam o
+   React Flow atualizar o próprio estado em todo quadro de animação durante o arraste. */
+const PAN_BUTTONS = [1, 2];
+const SNAP_GRID: [number, number] = [16, 16];
+const DELETE_KEYS = ['Delete', 'Backspace'];
+const MULTI_KEYS = ['Shift', 'Meta', 'Control'];
+const PRO = { hideAttribution: true };
+const MINIMAP_STYLE = { width: 168, height: 112 };
+const minimapColor = (n: { type?: string; data?: unknown }) =>
+  n.type === 'component' ? groupOf((n.data as { kind: ComponentKind }).kind).mini : n.type === 'frame' ? 'transparent' : '#C9B458';
+const minimapStroke = (n: { type?: string }) => (n.type === 'frame' ? '#7E8D94' : 'transparent');
+const onInit = () => mark('canvas-iniciado');
+const onNodeDoubleClick = (_: unknown, n: AppNode) => {
+  const s = useBoard.getState();
+  if (n.type === 'note' || n.type === 'text' || n.type === 'frame') s.setEditing(n.id);
+  else s.setTab('detalhes');
+};
+const onEdgeDoubleClick = (_: unknown, e: AppEdge) => useBoard.getState().setEditing(e.id);
+const onMoveEnd = (_: unknown, vp: { x: number; y: number; zoom: number }) => useBoard.getState().setViewport(vp);
+
 const isTyping = (el: Element | null) =>
   !!el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || (el as HTMLElement).isContentEditable);
 
@@ -42,6 +62,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   const tool = useBoard(s => s.tool);
   const loaded = useBoard(s => s.loaded);
   const boardId = useBoard(s => s.id);
+  const renderAll = useBoard(s => s.renderAll);
   const onNodesChange = useBoard(s => s.onNodesChange);
   const onEdgesChange = useBoard(s => s.onEdgesChange);
   const onConnect = useBoard(s => s.onConnect);
@@ -54,7 +75,14 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   const noteColor = useRef('amarelo');
   const clip = useRef<{ nodes: AppNode[]; edges: AppEdge[]; text: string } | null>(null);
 
-  const rfEdges = useMemo(() => edges.map(e => ({ ...e, markerEnd: MARKER })), [edges]);
+  /* Mantém a mesma referência para conexões que não mudaram: assim o React Flow só
+     redesenha as conexões alteradas, e não todas a cada atualização. */
+  const edgeCache = useRef(new WeakMap<AppEdge, AppEdge>());
+  const rfEdges = useMemo(() => edges.map(e => {
+    let v = edgeCache.current.get(e);
+    if (!v) { v = { ...e, markerEnd: MARKER }; edgeCache.current.set(e, v); }
+    return v;
+  }), [edges]);
 
   /* posição de referência: ponteiro sobre o quadro ou centro da tela */
   const anchor = useCallback(() => {
@@ -281,6 +309,11 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
     if (files.length) addImages(files, at);
   }, [rf, addComponentAt, addImages]);
 
+  const onPointerMove = useCallback((e: React.PointerEvent) => { pointer.current = { x: e.clientX, y: e.clientY }; }, []);
+  const onDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }, []);
+  const onPickImage = useCallback(() => fileRef.current?.click(), []);
+  const onAddFromPicker = useCallback((kind: ComponentKind) => { addComponentAt(kind); setPickerOpen(false); }, [addComponentAt]);
+
   const hand = tool === 'hand';
   const placing = tool === 'note' || tool === 'text' || tool === 'frame';
   const empty = loaded && nodes.length === 0;
@@ -289,8 +322,8 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
     <div
       ref={wrapRef}
       className={`canvas-area${placing ? ' tool-place' : ''}${hand ? ' tool-hand' : ''}`}
-      onPointerMove={e => { pointer.current = { x: e.clientX, y: e.clientY }; }}
-      onDragOver={e => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+      onPointerMove={onPointerMove}
+      onDragOver={onDragOver}
       onDrop={onDrop}
     >
       <ReactFlow<AppNode, AppEdge>
@@ -299,7 +332,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
-        onInit={() => mark('canvas-iniciado')}
+        onInit={onInit}
         onConnectEnd={onConnectEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -309,16 +342,12 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         onNodeDragStart={onNodeDragStart}
         onNodeDrag={onNodeDrag}
         onNodeDragStop={onNodeDragStop}
-        onNodeDoubleClick={(_, n) => {
-          const s = useBoard.getState();
-          if (n.type === 'note' || n.type === 'text' || n.type === 'frame') s.setEditing(n.id);
-          else s.setTab('detalhes');
-        }}
-        onEdgeDoubleClick={(_, ed) => useBoard.getState().setEditing(ed.id)}
+        onNodeDoubleClick={onNodeDoubleClick}
+        onEdgeDoubleClick={onEdgeDoubleClick}
         onSelectionChange={onSelectionChange}
         onPaneClick={onPaneClick}
-        onMoveEnd={(_, vp) => useBoard.getState().setViewport(vp)}
-        panOnDrag={hand ? true : [1, 2]}
+        onMoveEnd={onMoveEnd}
+        panOnDrag={hand ? true : PAN_BUTTONS}
         selectionOnDrag={!hand && !placing}
         selectionMode={SelectionMode.Partial}
         nodesDraggable={!hand}
@@ -328,21 +357,22 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         zoomOnScroll={prefs.wheel === 'zoom'}
         zoomOnDoubleClick={false}
         snapToGrid={prefs.snap}
-        snapGrid={[16, 16]}
+        snapGrid={SNAP_GRID}
         minZoom={0.1}
         maxZoom={3}
         elevateNodesOnSelect={false}
-        deleteKeyCode={['Delete', 'Backspace']}
-        multiSelectionKeyCode={['Shift', 'Meta', 'Control']}
+        deleteKeyCode={DELETE_KEYS}
+        multiSelectionKeyCode={MULTI_KEYS}
+        onlyRenderVisibleElements={!renderAll}
         colorMode="system"
-        proOptions={{ hideAttribution: true }}
+        proOptions={PRO}
       >
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.6} />
         {prefs.minimap && (
           <MiniMap
-            pannable zoomable position="bottom-right" style={{ width: 168, height: 112 }}
-            nodeColor={n => (n.type === 'component' ? groupOf((n as AppNode as { data: { kind: ComponentKind } }).data.kind).mini : n.type === 'frame' ? 'transparent' : '#C9B458')}
-            nodeStrokeColor={n => (n.type === 'frame' ? '#7E8D94' : 'transparent')}
+            pannable zoomable position="bottom-right" style={MINIMAP_STYLE}
+            nodeColor={minimapColor}
+            nodeStrokeColor={minimapStroke}
             nodeStrokeWidth={3}
             ariaLabel="Minimapa do quadro"
           />
@@ -369,8 +399,8 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       <Toolbar
         pickerOpen={pickerOpen}
         setPickerOpen={setPickerOpen}
-        onPickImage={() => fileRef.current?.click()}
-        onAddComponent={kind => { addComponentAt(kind); setPickerOpen(false); }}
+        onPickImage={onPickImage}
+        onAddComponent={onAddFromPicker}
         dragMime={DRAG_MIME}
       />
       <ZoomBar prefs={prefs} setPrefs={setPrefs} />

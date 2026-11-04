@@ -1,11 +1,29 @@
 'use client';
 import { getNodesBounds, getViewportForBounds, type Node } from '@xyflow/react';
-import { toJpeg, toPng } from 'html-to-image';
+import { useBoard } from './store';
+
+const frame = () => new Promise(r => requestAnimationFrame(() => r(null)));
 
 const bg = () => getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() || '#ffffff';
 
-/** Gera uma imagem do quadro inteiro (não só da parte visível). */
+/**
+ * Gera uma imagem do quadro inteiro (não só da parte visível). O canvas só desenha o que
+ * está na tela; durante a captura ele passa a desenhar tudo e depois volta ao normal.
+ */
 export async function boardImage(nodes: Node[], opts: { format: 'png' | 'jpeg'; maxSide?: number } = { format: 'png' }): Promise<string> {
+  const s = useBoard.getState();
+  s.setRenderAll(true);
+  try {
+    await frame(); await frame();
+    return await capture(nodes, opts);
+  } finally {
+    s.setRenderAll(false);
+  }
+}
+
+async function capture(nodes: Node[], opts: { format: 'png' | 'jpeg'; maxSide?: number } = { format: 'png' }): Promise<string> {
+  // Biblioteca carregada só na hora de exportar ou anexar a imagem.
+  const { toJpeg, toPng } = await import('html-to-image');
   const el = document.querySelector<HTMLElement>('.react-flow__viewport');
   if (!el || !nodes.length) throw new Error('O quadro está vazio.');
   const b = getNodesBounds(nodes);

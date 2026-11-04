@@ -22,7 +22,7 @@ test.describe('Componentes de arquitetura', () => {
   test('componente arrastado da paleta cai onde foi solto', async ({ app, page }) => {
     await app.quadroVazio();
     await page.getByRole('button', { name: 'Componentes', exact: true }).click();
-    await page.locator('.picker').getByRole('button', { name: 'Cache', exact: true }).dragTo(app.pane, { targetPosition: { x: 300, y: 300 } });
+    await page.locator('.picker').getByRole('button', { name: 'Cache', exact: true }).dragTo(app.pane, { targetPosition: { x: 750, y: 300 } });
     await expect(page.locator('.react-flow__node-component')).toHaveCount(1);
   });
 
@@ -169,7 +169,7 @@ test.describe('Conexões', () => {
   });
 
   test('Inspector: assíncrona, traçado, inverter e remover', async ({ app, page }) => {
-    await page.locator('.react-flow__edge[data-id="e1"] .react-flow__edge-interaction').click({ force: true });
+    await app.clicarConexao('e1');
     await app.aba('Detalhes');
     await expect(page.locator('.section h2')).toHaveText('Painel de links → API Gateway');
     await page.check('#i-async');
@@ -178,7 +178,7 @@ test.describe('Conexões', () => {
     await expect(page.locator('.react-flow__edge[data-id="e1"] .react-flow__edge-path')).toHaveAttribute('d', /C/);
     await page.getByRole('button', { name: 'Inverter direção' }).click();
     expect(await app.resumo()).toContain('API Gateway → Painel de links');
-    await page.locator('.react-flow__edge[data-id="e1"] .react-flow__edge-interaction').click({ force: true });
+    await app.clicarConexao('e1');
     await page.getByRole('button', { name: 'Remover', exact: true }).click();
     await expect(page.locator('.react-flow__edge')).toHaveCount(3);
   });
@@ -283,6 +283,7 @@ test.describe('Navegação e exibição', () => {
     await page.mouse.wheel(0, -400);
     await expect.poll(() => zoom(page)).toBeGreaterThan(z0);
     await page.getByRole('button', { name: 'Modo da roda do mouse' }).click();
+    await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
     const vp = page.locator('.react-flow__viewport');
     const antes = await vp.getAttribute('style');
     const z1 = await zoom(page);

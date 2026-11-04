@@ -46,7 +46,8 @@ test.describe('Chat de IA', () => {
     await expect(page.locator('.msg.user .attach')).toHaveText('imagem do quadro anexada');
   });
 
-  test('erro do provedor aparece como mensagem de erro', async ({ app, page }) => {
+  test('erro do provedor aparece como mensagem de erro', async ({ app, page, permitirConsole }) => {
+    permitirConsole.push(/status of 429/);
     await page.route('**/api/chat', route => route.fulfill({ status: 429, contentType: 'application/json', body: JSON.stringify({ error: 'Limite de uso atingido ou conta sem créditos no provedor.' }) }));
     await app.aba('IA');
     await page.fill('#ai-key', CHAVE);
@@ -135,7 +136,7 @@ test.describe('Cofre da chave', () => {
     await page.check('#ai-remember');
     await page.fill('#ai-pass', 'curta');
     await page.getByRole('button', { name: 'Salvar protegida' }).click();
-    await expect(page.getByRole('alert')).toContainText('pelo menos 8 caracteres');
+    await expect(page.locator('p[role="alert"]')).toContainText('pelo menos 8 caracteres');
   });
 
   test('salvar, recarregar, errar a senha, desbloquear, bloquear e apagar', async ({ app, page }) => {
@@ -151,7 +152,7 @@ test.describe('Cofre da chave', () => {
     await app.aba('IA');
     await page.fill('#ai-unlock-pass', 'senha-errada-000');
     await page.getByRole('button', { name: 'Desbloquear' }).click();
-    await expect(page.getByRole('alert')).toHaveText('Senha incorreta.', { timeout: 15_000 });
+    await expect(page.locator('p[role="alert"]')).toHaveText('Senha incorreta.', { timeout: 15_000 });
     await page.fill('#ai-unlock-pass', 'senha-forte-123');
     await page.getByRole('button', { name: 'Desbloquear' }).click();
     await expect(page.locator('#ai-key')).toHaveValue(CHAVE, { timeout: 15_000 });

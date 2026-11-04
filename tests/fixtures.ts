@@ -102,6 +102,17 @@ export class App {
     await this.page.mouse.up();
   }
 
+  /** Clica no meio do traçado de uma conexão (o ponto central da caixa nem sempre fica sobre a linha). */
+  async clicarConexao(id: string) {
+    const p = await this.page.locator(`.react-flow__edge[data-id="${id}"] .react-flow__edge-path`).evaluate((el: SVGPathElement) => {
+      const len = el.getTotalLength();
+      const pt = el.getPointAtLength(len / 2);
+      const m = el.getScreenCTM()!;
+      return { x: pt.x * m.a + pt.y * m.c + m.e, y: pt.x * m.b + pt.y * m.d + m.f };
+    });
+    await this.page.mouse.click(p.x, p.y);
+  }
+
   /** Posição do nó no quadro (coordenadas do fluxo), lida do transform. */
   async posicao(id: string) {
     const st = (await this.no(id).getAttribute('style')) || '';

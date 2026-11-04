@@ -6,7 +6,16 @@ import { appendFile, readFile, writeFile } from 'node:fs/promises';
 const ler = async p => { try { return JSON.parse(await readFile(p, 'utf8')); } catch { return null; } };
 const get = (o, path) => path.split('.').reduce((a, k) => (a == null ? undefined : a[k]), o);
 
-const perf = await ler('bench-results/desempenho.json');
+import { readdir } from 'node:fs/promises';
+let perf = null;
+try {
+  for (const f of await readdir('bench-results/desempenho')) {
+    const j = await ler(`bench-results/desempenho/${f}`);
+    if (!j) continue;
+    perf ??= { cpu: j.cpu };
+    perf[f.replace(/\.json$/, '')] = j.valor;
+  }
+} catch { /* sem resultados */ }
 const orc = await ler('tests/perf/orcamentos.json');
 const func = await ler('bench-results/funcional.json');
 const L = [];

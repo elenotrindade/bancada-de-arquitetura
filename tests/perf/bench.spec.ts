@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import type { CDPSession, Page } from '@playwright/test';
 import { App, expect, quadroGrande, test } from '../fixtures';
 
@@ -9,7 +9,11 @@ import { App, expect, quadroGrande, test } from '../fixtures';
  */
 
 const CPU = 4;
-const resultados: Record<string, unknown> = { cpu: CPU, data: new Date().toISOString() };
+/** Cada cenário grava o próprio arquivo, então uma falha não apaga os números dos outros. */
+function guardar(chave: string, valor: unknown) {
+  mkdirSync('bench-results/desempenho', { recursive: true });
+  writeFileSync(`bench-results/desempenho/${chave}.json`, JSON.stringify({ cpu: CPU, data: new Date().toISOString(), valor }, null, 2));
+}
 
 type Frames = {
   fps: number; media_ms: number; p95_ms: number; max_ms: number; quadros_lentos: number;
@@ -34,13 +38,15 @@ async function metricas(cdp: CDPSession) {
 
 async function gravar(page: Page, cdp: CDPSession, acao: () => Promise<void>): Promise<Frames> {
   await page.evaluate(() => {
-    const w = window as any;
-    w.__f = []; w.__lt = []; w.__on = true;
-    w.__po = new PerformanceObserver(l => { for (const e of l.getEntries()) w.__lt.push(e.duration); });
-    w.__po.observe({ entryTypes: ['longtask'] });
+    // Tudo dentro de um objeto próprio: propriedades soltas como window.__on colidem
+    // com o d3 (usado pelo React Flow), que guarda ouvintes em node.__on.
+    const b: any = { f: [], lt: [], ativo: true };
+    b.po = new PerformanceObserver(l => { for (const e of l.getEntries()) b.lt.push(e.duration); });
+    b.po.observe({ entryTypes: ['longtask'] });
     let last = performance.now();
-    const loop = (t: number) => { w.__f.push(t - last); last = t; if (w.__on) requestAnimationFrame(loop); };
+    const loop = (t: number) => { b.f.push(t - last); last = t; if (b.ativo) requestAnimationFrame(loop); };
     requestAnimationFrame(loop);
+    (window as any).__bancadaBench = b;
   });
   const m0 = await metricas(cdp);
   const t0 = Date.now();
@@ -49,8 +55,8 @@ async function gravar(page: Page, cdp: CDPSession, acao: () => Promise<void>): P
   const duracao = Date.now() - t0;
   const m1 = await metricas(cdp);
   const { f, lt } = await page.evaluate(() => {
-    const w = window as any; w.__on = false; w.__po.disconnect();
-    return { f: (w.__f as number[]).slice(1), lt: w.__lt as number[] };
+    const b = (window as any).__bancadaBench; b.ativo = false; b.po.disconnect();
+    return { f: (b.f as number[]).slice(1), lt: b.lt as number[] };
   });
   const media = f.reduce((a, b) => a + b, 0) / Math.max(1, f.length);
   return {
@@ -86,10 +92,6 @@ async function duracoes(page: Page, nome: string) {
   return page.evaluate(n => performance.getEntriesByName(`bancada:${n}`).map(e => Math.round(e.duration * 10) / 10), nome);
 }
 
-test.afterAll(async () => {
-  await mkdir('bench-results', { recursive: true });
-  await writeFile('bench-results/desempenho.json', JSON.stringify(resultados, null, 2));
-});
 
 test('carregamento da página (mediana de 3, cache vazio)', async ({ browser }) => {
   const runs: Record<string, number>[] = [];
@@ -129,7 +131,7 @@ test('carregamento da página (mediana de 3, cache vazio)', async ({ browser }) 
   }
   const out: Record<string, number> = {};
   for (const k of Object.keys(runs[0])) out[k] = mediana(runs.map(r => r[k]));
-  resultados.carregamento = out;
+  guardar('carregamento', out);
   expect(out.quadro_pronto_ms).toBeGreaterThan(0);
 });
 
@@ -227,6 +229,6 @@ for (const n of [50, 150, 300]) {
 
     const m2 = await metricas(cdp);
     r.heap_final_mb = r1(m2.JSHeapUsedSize / 1048576);
-    resultados[`n${n}`] = r;
+    guardar(`n${n}`, r);
   });
 }

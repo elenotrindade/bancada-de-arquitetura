@@ -235,6 +235,9 @@ a { color: var(--accent); }
 .react-flow__resize-control.line { border-color: transparent; }
 
 /* barra de ações do nó selecionado */
+/* A barra do elemento precisa ficar acima do fundo do quadro. Sem isso, nas áreas
+   (zIndex -1) ela era desenhada por baixo e os cliques iam para o fundo. */
+.react-flow__node-toolbar { z-index: 1000 !important; }
 .node-actions {
   display: flex; align-items: center; gap: 2px; background: var(--panel); border: 1px solid var(--line); border-radius: 9px; padding: 3px;
   box-shadow: var(--shadow);

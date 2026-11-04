@@ -1,5 +1,5 @@
 'use client';
-import type { ReactNode } from 'react';
+import { memo, type ReactNode } from 'react';
 import { CATALOG, GROUPS, type ComponentKind } from '@/lib/catalog';
 import { useBoard } from '@/lib/store';
 import type { Tool } from '@/lib/types';
@@ -22,7 +22,7 @@ function ToolBtn({ label, kbd, pressed, onClick, disabled, children }: { label: 
   );
 }
 
-export default function Toolbar({ pickerOpen, setPickerOpen, onPickImage, onAddComponent, dragMime }: Props) {
+function Toolbar({ pickerOpen, setPickerOpen, onPickImage, onAddComponent, dragMime }: Props) {
   const tool = useBoard(s => s.tool);
   const setTool = useBoard(s => s.setTool);
   const undo = useBoard(s => s.undo);
@@ -71,3 +71,5 @@ export default function Toolbar({ pickerOpen, setPickerOpen, onPickImage, onAddC
     </>
   );
 }
+
+export default memo(Toolbar);

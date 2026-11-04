@@ -1,8 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { useReactFlow } from '@xyflow/react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
+import dynamic from 'next/dynamic';
 import { uid } from '@/lib/boards';
 import { boardImage } from '@/lib/exportImage';
 import { getKey, hasVault, purgeLegacyKeys } from '@/lib/keyVault';
@@ -14,6 +13,8 @@ import { buildSummary } from '@/lib/summary';
 import type { ChatMsg } from '@/lib/types';
 import { IconSend } from '../Icons';
 import KeySettings, { initialVaultState, type VaultState } from './KeySettings';
+
+const Markdown = dynamic(() => import('./Markdown'), { ssr: false, loading: () => <span className="typing">Carregando…</span> });
 
 const QUICK = [
   'Revise meu desenho',
@@ -168,7 +169,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
           <div key={m.id} className={`msg ${m.role}${m.error ? ' error' : ''}`}>
             {m.role === 'assistant' && !m.error
               ? (m.content
-                ? <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]} components={{ a: ({ node, ...props }) => { void node; return <a {...props} target="_blank" rel="noopener noreferrer nofollow" />; } }}>{m.content}</ReactMarkdown></div>
+                ? <div className="md"><Markdown text={m.content} /></div>
                 : <span className="typing">Pensando…</span>)
               : m.content}
             {m.withImage && <span className="attach">imagem do quadro anexada</span>}
