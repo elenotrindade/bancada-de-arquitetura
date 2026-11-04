@@ -42,6 +42,7 @@ Outros comandos: `npm run build`, `npm run typecheck`, `npm run smoke` (teste de
 - Salva, ela fica num cofre no IndexedDB, cifrada com AES-GCM 256 usando uma chave derivada da senha da pessoa (PBKDF2-SHA256, 600 mil iterações, sal aleatório). Sem a senha, ninguém lê, nem quem copiar os dados do navegador. A cada visita a senha é pedida de novo.
 - Nada vai para localStorage ou sessionStorage; chaves gravadas lá por versões antigas são apagadas automaticamente.
 - A chave passa pela rota `/api/chat` só para chegar ao provedor. O servidor não grava nem registra a chave.
+- Recomendação exibida no app: usar uma chave exclusiva para a Bancada, com limite de gasto mensal definido no painel do provedor. Se ela vazar, o prejuízo tem teto e a chave pode ser revogada sem afetar outros usos.
 
 **Proteções na página.**
 

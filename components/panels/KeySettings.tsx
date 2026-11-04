@@ -87,6 +87,9 @@ export default function KeySettings({ provider, vault, setVault, keyValue, setKe
           <button type="button" className="btn small" onClick={() => setShowKey(v => !v)}>{showKey ? 'Ocultar' : 'Mostrar'}</button>
         </div>
       </div>
+      <p className="small" style={{ margin: 0, borderLeft: '3px solid var(--warn)', paddingLeft: 10 }}>
+        Recomendado: crie uma chave só para este app e defina um limite de gasto mensal no painel do provedor. Se a chave vazar, o prejuízo fica limitado a esse valor, e você pode revogá-la sem afetar outros usos.
+      </p>
 
       {vault === 'unlocked' ? (
         <>
