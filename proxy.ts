@@ -24,7 +24,7 @@ export function proxy(request: NextRequest) {
     "media-src 'none'",
     "frame-src 'none'",
     "object-src 'none'",
-    "base-uri 'none'",
+    "base-uri 'self'",
     "form-action 'self'",
     "frame-ancestors 'none'",
     ...(https ? ['upgrade-insecure-requests'] : [])
