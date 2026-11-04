@@ -1,0 +1,238 @@
+// Teste de fumaça do app rodando em http://localhost:3000.
+// Exercita o canvas, imagens, conexões, persistência, exportação e o chat (com chave inválida),
+// salva screenshots em ./screenshots e falha se algo quebrar ou houver erro no console.
+import { chromium } from 'playwright';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import zlib from 'node:zlib';
+
+const BASE = process.env.BASE_URL || 'http://localhost:3000';
+const OUT = 'screenshots';
+mkdirSync(OUT, { recursive: true });
+const report = [];
+const errors = [];
+const log = (ok, msg) => { report.push(`${ok ? 'OK  ' : 'FAIL'} ${msg}`); console.log(`${ok ? 'OK  ' : 'FAIL'} ${msg}`); };
+
+async function waitForServer() {
+  for (let i = 0; i < 90; i++) {
+    try { const r = await fetch(BASE); if (r.ok) return; } catch { /* aguardando */ }
+    await new Promise(r => setTimeout(r, 1000));
+  }
+  throw new Error('Servidor não respondeu em 90 s');
+}
+
+/** PNG 120x80 gerado na hora, sem dependências. */
+function makePng(w = 120, h = 80) {
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = buf => { let c = 0xffffffff; for (const b of buf) c = crcTable[(c ^ b) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type, data) => {
+    const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
+    const td = Buffer.concat([Buffer.from(type), data]);
+    const c = Buffer.alloc(4); c.writeUInt32BE(crc(td));
+    return Buffer.concat([len, td, c]);
+  };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2;
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const o = y * (w * 3 + 1) + 1 + x * 3;
+    raw[o] = 30 + x; raw[o + 1] = 107; raw[o + 2] = 88 + y;
+  }
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+async function check(name, fn) {
+  try { await fn(); log(true, name); }
+  catch (e) { log(false, `${name}: ${e.message.split('\n')[0]}`); }
+}
+
+const count = (page, sel) => page.locator(sel).count();
+
+await waitForServer();
+const browser = await chromium.launch();
+
+// ---------- desktop, tema claro ----------
+const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
+const page = await ctx.newPage();
+page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
+page.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) errors.push(`console: ${m.text()}`); });
+
+await page.goto(BASE);
+await check('quadro de exemplo carrega', async () => {
+  await page.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
+  const n = await count(page, '.react-flow__node-component');
+  if (n < 5) throw new Error(`esperava 5 componentes, veio ${n}`);
+});
+await page.waitForTimeout(600);
+await page.screenshot({ path: `${OUT}/01-desktop-claro.png` });
+
+const pane = page.locator('.react-flow__pane');
+
+await check('adiciona componente pela paleta (atalho C)', async () => {
+  const before = await count(page, '.react-flow__node-component');
+  await pane.click({ position: { x: 1000, y: 650 } });
+  await page.keyboard.press('c');
+  await page.locator('.picker').waitFor();
+  await page.screenshot({ path: `${OUT}/02-paleta.png` });
+  await page.locator('.pick', { hasText: 'Fila' }).click();
+  await page.waitForTimeout(200);
+  const after = await count(page, '.react-flow__node-component');
+  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
+});
+
+await check('cria nota adesiva e escreve', async () => {
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('n');
+  await pane.click({ position: { x: 300, y: 700 } });
+  const ta = page.locator('.n-note textarea');
+  await ta.waitFor();
+  await ta.type('Risco: o banco aguenta 5x?');
+  await page.keyboard.press('Escape');
+  await page.locator('.n-note', { hasText: 'Risco: o banco aguenta 5x?' }).waitFor();
+});
+
+await check('cria área (frame)', async () => {
+  const before = await count(page, '.react-flow__node-frame');
+  await page.keyboard.press('f');
+  await pane.click({ position: { x: 1100, y: 250 } });
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(200);
+  if ((await count(page, '.react-flow__node-frame')) !== before + 1) throw new Error('área não criada');
+});
+
+await check('adiciona imagem pelo seletor de arquivo', async () => {
+  await page.setInputFiles('#image-input', { name: 'diagrama.png', mimeType: 'image/png', buffer: makePng() });
+  await page.locator('.n-image img').first().waitFor({ timeout: 5000 });
+});
+
+await check('desfazer remove a imagem e refazer devolve', async () => {
+  const before = await count(page, '.react-flow__node-image');
+  await page.locator('.react-flow__pane').click({ position: { x: 700, y: 820 } });
+  await page.keyboard.press('Control+z');
+  await page.waitForTimeout(200);
+  const undone = await count(page, '.react-flow__node-image');
+  await page.keyboard.press('Control+Shift+z');
+  await page.waitForTimeout(200);
+  const redone = await count(page, '.react-flow__node-image');
+  if (!(undone === before - 1 && redone === before)) throw new Error(`${before} -> ${undone} -> ${redone}`);
+});
+
+await check('conecta dois componentes arrastando a alça', async () => {
+  const before = await count(page, '.react-flow__edge');
+  await page.keyboard.press('Escape');
+  await page.locator('[data-testid="rf__wrapper"], .react-flow').first().click({ position: { x: 5, y: 5 } }).catch(() => {});
+  await page.locator('button[aria-label="Enquadrar tudo"]').click();
+  await page.waitForTimeout(400);
+  const src = page.locator('.react-flow__node[data-id="a5"]');
+  await src.hover();
+  const h = src.locator('.react-flow__handle-right');
+  const hb = await h.boundingBox();
+  const tb = await page.locator('.react-flow__node[data-id="a4"]').boundingBox();
+  if (!hb || !tb) throw new Error('elementos não encontrados');
+  await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tb.x + tb.width / 2, tb.y + tb.height / 2, { steps: 12 });
+  await page.mouse.up();
+  await page.waitForTimeout(300);
+  const after = await count(page, '.react-flow__edge');
+  if (after !== before + 1) throw new Error(`${before} -> ${after}`);
+});
+await page.screenshot({ path: `${OUT}/03-apos-edicoes.png` });
+
+await check('inspetor mostra detalhes do componente', async () => {
+  await page.locator('.react-flow__node[data-id="a3"]').click();
+  await page.locator('#tab-detalhes').click();
+  await page.locator('#i-name').waitFor();
+  const v = await page.locator('#i-name').inputValue();
+  if (v !== 'Serviço de links') throw new Error(`nome: ${v}`);
+});
+
+await check('resumo para IA inclui cenário e anotações', async () => {
+  await page.getByRole('button', { name: 'Resumo para IA' }).click();
+  const ta = page.locator('.modal textarea');
+  await ta.waitFor();
+  const t = await ta.inputValue();
+  for (const s of ['# Exercício de arquitetura: Encurtador de links', 'Serviço de links', 'Risco: o banco aguenta 5x?', '## Conexões']) {
+    if (!t.includes(s)) throw new Error(`faltou "${s}"`);
+  }
+  await page.screenshot({ path: `${OUT}/04-resumo.png` });
+  await page.getByRole('button', { name: 'Fechar' }).click();
+});
+
+await check('exporta PNG do quadro', async () => {
+  await page.getByRole('button', { name: 'Arquivo' }).click();
+  const [dl] = await Promise.all([page.waitForEvent('download', { timeout: 15000 }), page.getByRole('menuitem', { name: /Exportar imagem/ }).click()]);
+  const path = await dl.path();
+  if (!path) throw new Error('download vazio');
+  await dl.saveAs(`${OUT}/05-export.png`);
+});
+
+await check('chat de IA mostra erro amigável com chave inválida', async () => {
+  await page.locator('#tab-ia').click();
+  await page.selectOption('#ai-provider', 'anthropic');
+  await page.fill('#ai-key', 'sk-ant-chave-invalida-para-teste');
+  await page.fill('#chat-input', 'Revise meu desenho');
+  await page.keyboard.press('Enter');
+  const err = page.locator('.msg.error');
+  await err.waitFor({ timeout: 20000 });
+  const t = await err.innerText();
+  if (!/Chave de API inválida|provedor/i.test(t)) throw new Error(`mensagem: ${t}`);
+  await page.screenshot({ path: `${OUT}/06-chat-erro.png` });
+});
+
+await check('rota /api/models valida o provedor', async () => {
+  const r = await page.request.post(`${BASE}/api/models`, { data: { provider: 'xpto', apiKey: '12345678' } });
+  if (r.status() !== 400) throw new Error(`status ${r.status()}`);
+});
+
+await check('quadro persiste após recarregar', async () => {
+  const before = await count(page, '.react-flow__node');
+  await page.waitForTimeout(900);
+  await page.reload();
+  await page.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
+  await page.waitForTimeout(400);
+  const after = await count(page, '.react-flow__node');
+  if (after !== before) throw new Error(`${before} -> ${after}`);
+});
+
+await check('troca de cenário abre quadro vazio', async () => {
+  await page.selectOption('#scenario', 'delivery');
+  await page.locator('.empty-hint').waitFor({ timeout: 5000 });
+  await page.screenshot({ path: `${OUT}/07-cenario-vazio.png` });
+  await page.selectOption('#scenario', 'encurtador');
+  await page.locator('.react-flow__node-component').first().waitFor();
+});
+await ctx.close();
+
+// ---------- tema escuro ----------
+const dark = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'dark' });
+const dp = await dark.newPage();
+dp.on('pageerror', e => errors.push(`pageerror (escuro): ${e.message}`));
+await dp.goto(BASE);
+await dp.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
+await dp.waitForTimeout(600);
+await dp.screenshot({ path: `${OUT}/08-desktop-escuro.png` });
+await dark.close();
+
+// ---------- celular ----------
+const mob = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: 'light', isMobile: true, hasTouch: true });
+const mp = await mob.newPage();
+mp.on('pageerror', e => errors.push(`pageerror (celular): ${e.message}`));
+await mp.goto(BASE);
+await mp.locator('.react-flow__node-component').first().waitFor({ timeout: 15000 });
+await mp.waitForTimeout(600);
+await check('celular sem rolagem horizontal', async () => {
+  const w = await mp.evaluate(() => document.documentElement.scrollWidth);
+  if (w > 391) throw new Error(`scrollWidth ${w}`);
+});
+await mp.screenshot({ path: `${OUT}/09-celular.png` });
+await mp.getByRole('button', { name: 'Painel' }).click();
+await mp.waitForTimeout(300);
+await mp.screenshot({ path: `${OUT}/10-celular-painel.png` });
+await mob.close();
+
+await browser.close();
+
+if (errors.length) { log(false, `erros no console:\n  ${errors.slice(0, 15).join('\n  ')}`); }
+writeFileSync(`${OUT}/report.txt`, report.join('\n') + '\n');
+const failed = report.filter(r => r.startsWith('FAIL')).length;
+console.log(`\n${report.length - failed}/${report.length} verificações passaram`);
+process.exit(failed ? 1 : 0);
