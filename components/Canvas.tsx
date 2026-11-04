@@ -6,6 +6,7 @@ import {
 } from '@xyflow/react';
 import { CATALOG, groupOf, type ComponentKind } from '@/lib/catalog';
 import { uid } from '@/lib/boards';
+import { mark } from '@/lib/perf';
 import { fileToImage } from '@/lib/image';
 import type { Prefs } from '@/lib/prefs';
 import { sizeOf, useBoard } from '@/lib/store';
@@ -298,6 +299,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onInit={() => mark('canvas-iniciado')}
         onConnectEnd={onConnectEnd}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}

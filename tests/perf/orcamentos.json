@@ -1,0 +1,21 @@
+{
+  "_sobre": "Limites de desempenho com CPU 4x mais lenta. 'max' falha se o valor passar do limite; 'min' falha se ficar abaixo.",
+  "carregamento.fcp_ms": { "max": 2000, "rotulo": "Carregamento: primeira pintura" },
+  "carregamento.quadro_pronto_ms": { "max": 3000, "rotulo": "Carregamento: quadro pronto para uso" },
+  "carregamento.tbt_ms": { "max": 500, "rotulo": "Carregamento: tempo de bloqueio (TBT)" },
+  "carregamento.js_kb": { "max": 450, "rotulo": "Carregamento: JavaScript baixado (comprimido, KB)" },
+  "n50.arrastar_um.p95_ms": { "max": 34, "rotulo": "50 componentes: arrastar um (p95 do quadro, ms)" },
+  "n150.quadro_pronto_ms": { "max": 4000, "rotulo": "150 componentes: quadro pronto" },
+  "n150.arrastar_um.p95_ms": { "max": 50, "rotulo": "150 componentes: arrastar um (p95, ms)" },
+  "n150.arrastar_um.fps": { "min": 30, "rotulo": "150 componentes: arrastar um (FPS)" },
+  "n150.arrastar_todos.p95_ms": { "max": 120, "rotulo": "150 componentes: arrastar tudo selecionado (p95, ms)" },
+  "n150.mover_quadro.p95_ms": { "max": 50, "rotulo": "150 componentes: mover o quadro (p95, ms)" },
+  "n150.zoom.p95_ms": { "max": 60, "rotulo": "150 componentes: zoom (p95, ms)" },
+  "n150.digitar.p95_ms": { "max": 50, "rotulo": "150 componentes: digitar no Inspector (p95, ms)" },
+  "n150.adicionar_ms": { "max": 400, "rotulo": "150 componentes: adicionar pela paleta (ms)" },
+  "n150.desfazer_ms": { "max": 400, "rotulo": "150 componentes: desfazer (ms)" },
+  "n150.salvar_ms": { "max": 150, "rotulo": "150 componentes: salvar no navegador (ms)" },
+  "n300.quadro_pronto_ms": { "max": 6000, "rotulo": "300 componentes: quadro pronto" },
+  "n300.arrastar_um.p95_ms": { "max": 70, "rotulo": "300 componentes: arrastar um (p95, ms)" },
+  "n300.heap_final_mb": { "max": 150, "rotulo": "300 componentes: memória JS (MB)" }
+}

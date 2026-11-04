@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { loadPrefs, savePrefs, type Prefs } from '@/lib/prefs';
 import { SCENARIOS } from '@/lib/scenarios';
+import { mark } from '@/lib/perf';
 import { useBoard } from '@/lib/store';
 import Canvas from './Canvas';
 import Sidebar from './panels/Sidebar';
@@ -27,7 +28,7 @@ export default function Board() {
     const scenario = SCENARIOS.some(s => s.id === p.scenario) ? p.scenario : 'encurtador';
     setPrefsState({ ...p, scenario });
     if (window.matchMedia('(max-width: 960px)').matches) useBoard.getState().setSidebarOpen(false);
-    useBoard.getState().load(scenario);
+    useBoard.getState().load(scenario).then(() => requestAnimationFrame(() => requestAnimationFrame(() => mark('quadro-pronto'))));
   }, []);
 
   /* salva no IndexedDB com atraso, a cada mudança do quadro */

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange, type XYPosition } from '@xyflow/react';
 import { guessLabel, isAsyncLabel, type ComponentKind, CATALOG } from './catalog';
 import { cleanEdges, cleanNodes, emptyBoard, loadBoard, saveBoard, uid } from './boards';
+import { measureAsync } from './perf';
 import type { Adr, AppEdge, AppNode, ArchEdgeData, Board, ChatMsg, CustomScenario, SideTab, Tool } from './types';
 
 type Snap = { nodes: AppNode[]; edges: AppEdge[] };
@@ -69,7 +70,7 @@ export const useBoard = create<State>()((set, get) => ({
   future: [],
 
   load: async (id) => {
-    const b = await loadBoard(id);
+    const b = await measureAsync('carregar', () => loadBoard(id));
     set({ ...b, viewport: b.viewport, sample: b.sample, loaded: true, past: [], future: [], editingId: null, tool: 'select' });
   },
 
@@ -80,7 +81,7 @@ export const useBoard = create<State>()((set, get) => ({
       id: s.id, nodes: cleanNodes(s.nodes), edges: cleanEdges(s.edges), adrs: s.adrs, checks: s.checks,
       twist: s.twist, custom: s.custom, chat: s.chat.slice(-60), viewport: s.viewport, sample: s.sample, updatedAt: Date.now()
     };
-    const ok = await saveBoard(b);
+    const ok = await measureAsync('salvar', () => saveBoard(b));
     if (ok !== !s.saveError) set({ saveError: !ok });
   },
 

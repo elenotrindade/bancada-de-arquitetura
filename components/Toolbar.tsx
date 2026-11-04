@@ -56,7 +56,7 @@ export default function Toolbar({ pickerOpen, setPickerOpen, onPickImage, onAddC
               <div className="picker-items">
                 {(Object.keys(CATALOG) as ComponentKind[]).filter(k => CATALOG[k].g === g.id).map(k => (
                   <button
-                    key={k} type="button" className="pick" draggable title={CATALOG[k].what}
+                    key={k} type="button" className="pick" draggable title={CATALOG[k].what} aria-label={CATALOG[k].label}
                     onClick={() => onAddComponent(k)}
                     onDragStart={e => { e.dataTransfer.setData(dragMime, k); e.dataTransfer.effectAllowed = 'copy'; }}
                   >

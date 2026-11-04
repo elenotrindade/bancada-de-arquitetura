@@ -10,9 +10,10 @@ permissions:
   contents: read
 
 jobs:
-  build-and-smoke:
+  bancada:
+    name: Bancada de testes
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
 
@@ -23,31 +24,70 @@ jobs:
       - name: Instalar dependências
         run: npm install --no-audit --no-fund
 
-      - name: Build de produção
-        run: npm run build
-
       - name: Checagem de tipos
         run: npm run typecheck
+
+      - name: Build de produção
+        run: npm run build
 
       - name: Instalar navegador
         run: npx playwright install --with-deps chromium
 
-      - name: Teste de fumaça
-        run: |
-          npm run start -- -p 3000 > server.log 2>&1 &
-          node scripts/smoke.mjs
+      - name: Testes funcionais
+        id: funcional
+        run: npx playwright test --project=funcional
 
-      - name: Log do servidor
+      - name: Benchmark de desempenho
+        id: desempenho
+        if: always() && steps.funcional.conclusion != 'skipped'
+        env:
+          PW_JSON: bench-results/desempenho-testes.json
+          PW_HTML: playwright-report-desempenho
+        run: npx playwright test --project=desempenho --workers=1
+
+      - name: Relatório
         if: always()
-        run: tail -n 80 server.log || true
+        run: node scripts/bench-report.mjs
 
-      - name: Guardar screenshots e lockfile
+      - name: Guardar relatórios
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: smoke
+          name: bancada
           path: |
-            screenshots/
-            package-lock.json
-          retention-days: 7
+            playwright-report/
+            playwright-report-desempenho/
+            bench-results/
+            test-results/
+          retention-days: 14
 
+  standalone:
+    name: Build autocontido para depuração
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build
+        run: |
+          npm install --no-audit --no-fund
+          STANDALONE=1 npm run build
+      - name: Publicar no branch build-standalone
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          [ -d public ] && cp -r public .next/standalone/public || true
+          cp package-lock.json .next/standalone/package-lock.atualizado.json
+          cd .next/standalone
+          git init -q -b build-standalone
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add -A -f
+          git commit -qm "Build autocontido de ${GITHUB_SHA::7}"
+          git push -f -q "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" build-standalone

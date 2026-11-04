@@ -7,3 +7,6 @@ out/
 !.env.example
 screenshots/
 .DS_Store
+test-results/
+playwright-report/
+bench-results/

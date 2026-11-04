@@ -4,6 +4,7 @@ import { useReactFlow } from '@xyflow/react';
 import { boardImage, download, downloadText } from '@/lib/exportImage';
 import { SCENARIOS, scenarioById } from '@/lib/scenarios';
 import { useBoard } from '@/lib/store';
+import { measure, measureAsync } from '@/lib/perf';
 import { buildSummary } from '@/lib/summary';
 import { IconPanel } from './Icons';
 
@@ -40,7 +41,7 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
 
   const openSummary = async () => {
     setMenu(false);
-    const text = buildSummary(useBoard.getState(), { withPrompt: true });
+    const text = measure('resumo', () => buildSummary(useBoard.getState(), { withPrompt: true }));
     setSummary(text);
     try { await navigator.clipboard.writeText(text); setCopyStatus('Copiado. Cole em qualquer chat de IA.'); }
     catch { setCopyStatus('Selecione o texto e copie manualmente.'); }
@@ -48,7 +49,7 @@ export default function TopBar({ scenario, onScenario, notify }: Props) {
 
   const exportPng = async () => {
     setMenu(false);
-    try { download(await boardImage(rf.getNodes(), { format: 'png' }), `${name()}.png`); notify('Imagem exportada'); }
+    try { download(await measureAsync('exportar-png', () => boardImage(rf.getNodes(), { format: 'png' })), `${name()}.png`); notify('Imagem exportada'); }
     catch (e) { notify((e as Error).message); }
   };
 

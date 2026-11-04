@@ -1,6 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Build autocontido usado só para depurar desempenho fora da Vercel (STANDALONE=1 npm run build).
+  ...(process.env.STANDALONE ? { output: 'standalone' } : {}),
   poweredByHeader: false,
   async headers() {
     return [

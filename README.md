@@ -32,7 +32,30 @@ npm run dev
 # http://localhost:3000
 ```
 
-Outros comandos: `npm run build`, `npm run typecheck`, `npm run smoke` (teste de ponta a ponta com Playwright contra o app rodando em `localhost:3000`).
+Outros comandos: `npm run build`, `npm run typecheck`.
+
+## Bancada de testes
+
+Depois de `npm run build`, rode:
+
+```bash
+npx playwright install chromium   # uma vez
+npm test                          # testes funcionais
+npm run bench                     # benchmark de desempenho + relatório
+```
+
+O servidor sobe sozinho. Os testes ficam em `tests/`:
+
+| Arquivo | Cobre |
+| --- | --- |
+| `canvas.spec.ts` | Os 20 tipos de componente, notas, textos, áreas, imagens, conexões, barra do elemento, seleção, copiar e colar, desfazer, zoom, mão, grade e minimapa |
+| `panels.spec.ts` | Cenários, mudança de requisito, perguntas, decisões, resumo, exportação e persistência |
+| `chat.spec.ts` | Chat com respostas simuladas e uma chamada real com chave inválida, modelos, provedores e cofre da chave |
+| `security.spec.ts` | CSP, cabeçalhos, rotas de IA, quadro adulterado, colar JSON externo, imagens e armazenamento |
+| `responsive.spec.ts` | Celular e tema escuro, com capturas de tela no relatório |
+| `perf/bench.spec.ts` | Carregamento (FCP, LCP, TBT, JS baixado) e quadros com 50, 150 e 300 componentes: FPS e tempo de quadro ao arrastar, mover, dar zoom e digitar, além de adicionar, desfazer, salvar, resumir, exportar e memória |
+
+O benchmark roda com a CPU 4x mais lenta, como o Lighthouse, para simular um notebook comum. Os limites ficam em `tests/perf/orcamentos.json`; se algum estourar, o CI falha. No GitHub, o resultado aparece no resumo de cada execução do CI, e o relatório completo do Playwright fica nos artefatos.
 
 ## Segurança
 

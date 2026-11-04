@@ -9,6 +9,7 @@ import { getKey, hasVault, purgeLegacyKeys } from '@/lib/keyVault';
 import { loadAi, saveAi, type AiPrefs } from '@/lib/prefs';
 import { PROVIDERS, SYSTEM_PROMPT, type ProviderId } from '@/lib/providers';
 import { useBoard } from '@/lib/store';
+import { measure } from '@/lib/perf';
 import { buildSummary } from '@/lib/summary';
 import type { ChatMsg } from '@/lib/types';
 import { IconSend } from '../Icons';
@@ -91,7 +92,7 @@ export default function ChatPanel({ notify }: { notify: (m: string) => void }) {
     setChat(c => [...c, userMsg, asst]);
     setInput('');
 
-    const system = `${SYSTEM_PROMPT}\n\n---\nEstado atual do quadro (atualizado agora):\n\n${buildSummary(s)}`;
+    const system = `${SYSTEM_PROMPT}\n\n---\nEstado atual do quadro (atualizado agora):\n\n${measure('resumo', () => buildSummary(s))}`;
     const payload = {
       provider, model, apiKey: key, system,
       messages: history.map(m => ({ role: m.role, content: m.content, ...(m.id === userMsg.id && image ? { image } : {}) }))

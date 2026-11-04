@@ -8,7 +8,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "smoke": "node scripts/smoke.mjs"
+    "test": "playwright test --project=funcional",
+    "bench": "PW_JSON=bench-results/desempenho-testes.json playwright test --project=desempenho --workers=1; node scripts/bench-report.mjs",
+    "bench:relatorio": "node scripts/bench-report.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.5.0",
@@ -24,10 +26,10 @@
     "zustand": "^5.0.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.50.0",
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "playwright": "^1.50.0",
     "typescript": "^5.6.0"
   },
   "engines": {
