@@ -1,0 +1,17 @@
+OK   quadro de exemplo carrega
+OK   inspetor mostra detalhes do componente
+OK   conecta soltando a linha em cima de outro componente
+OK   resumo para IA inclui cenário e componentes
+OK   atalho C abre componentes e adiciona uma fila
+OK   cria nota adesiva e escreve
+OK   cria texto e área
+OK   adiciona imagem pelo seletor de arquivo
+OK   desfazer e refazer pelo teclado
+OK   duplicar com Ctrl+D
+OK   resumo inclui anotações e áreas
+OK   exporta PNG do quadro
+OK   chat de IA mostra erro amigável com chave inválida
+OK   rota /api/models valida o provedor
+OK   quadro persiste após recarregar
+OK   volta ao encurtador com as edições anteriores
+OK   celular sem rolagem horizontal
