@@ -1,6 +1,7 @@
 'use client';
 import { memo } from 'react';
 import { NodeResizer, type NodeProps } from '@xyflow/react';
+import { useIsEditing } from '@/lib/editing';
 import { useBoard } from '@/lib/store';
 import type { NoteNodeT } from '@/lib/types';
 import EditableText from './EditableText';
@@ -10,7 +11,7 @@ import NodeActions from './NodeActions';
 const snapshotNow = () => useBoard.getState().snapshot();
 
 function NoteNode({ id, data, selected }: NodeProps<NoteNodeT>) {
-  const editing = useBoard(s => s.editingId === id);
+  const editing = useIsEditing(id);
   return (
     <>
       {selected && <NodeActions id={id} colors="note" color={data.color} />}

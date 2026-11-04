@@ -6,6 +6,7 @@ import {
 } from '@xyflow/react';
 import { CATALOG, groupOf, type ComponentKind } from '@/lib/catalog';
 import { uid } from '@/lib/boards';
+import { EditingContext } from '@/lib/editing';
 import { mark } from '@/lib/perf';
 import { fileToImage } from '@/lib/image';
 import type { Prefs } from '@/lib/prefs';
@@ -63,6 +64,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   const loaded = useBoard(s => s.loaded);
   const boardId = useBoard(s => s.id);
   const renderAll = useBoard(s => s.renderAll);
+  const editingId = useBoard(s => s.editingId);
   const onNodesChange = useBoard(s => s.onNodesChange);
   const onEdgesChange = useBoard(s => s.onEdgesChange);
   const onConnect = useBoard(s => s.onConnect);
@@ -157,7 +159,9 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   /* ---------- teclado ---------- */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (isTyping(document.activeElement)) return;
+      // O React também escuta no document e já pode ter desmontado o campo que recebeu a
+      // tecla (ex.: Enter que encerra a edição). Por isso olhamos o alvo do evento e não o foco.
+      if (e.defaultPrevented || isTyping(e.target as Element) || isTyping(document.activeElement)) return;
       if (document.querySelector('.modal-back')) return;
       const s = useBoard.getState();
       const mod = e.metaKey || e.ctrlKey;
@@ -326,6 +330,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       onDragOver={onDragOver}
       onDrop={onDrop}
     >
+      <EditingContext.Provider value={editingId}>
       <ReactFlow<AppNode, AppEdge>
         nodes={nodes}
         edges={rfEdges}
@@ -378,6 +383,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
           />
         )}
       </ReactFlow>
+      </EditingContext.Provider>
 
       {empty && (
         <div className="empty-hint">

@@ -1,6 +1,7 @@
 'use client';
 import { memo, useEffect, useRef } from 'react';
 import { NodeResizer, type NodeProps } from '@xyflow/react';
+import { useIsEditing } from '@/lib/editing';
 import { useBoard } from '@/lib/store';
 import type { FrameNodeT } from '@/lib/types';
 import NodeActions from './NodeActions';
@@ -10,7 +11,7 @@ import NodeActions from './NodeActions';
  * selecionar em caixa e mexer nos componentes dentro dela. Arraste pelo título ou pela borda.
  */
 function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
-  const editing = useBoard(s => s.editingId === id);
+  const editing = useIsEditing(id);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,7 +29,7 @@ function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
               ref={ref} type="text" className="nodrag" defaultValue={data.title} aria-label="Título da área"
               onChange={e => useBoard.getState().updateNodeData(id, { title: e.target.value })}
               onBlur={() => useBoard.getState().setEditing(null)}
-              onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') useBoard.getState().setEditing(null); }}
+              onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); useBoard.getState().setEditing(null); } }}
             />
           ) : (data.title || 'Área sem título')}
         </div>

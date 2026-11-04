@@ -1,10 +1,11 @@
 'use client';
 import { useEffect, useRef } from 'react';
+import { useIsEditing } from '@/lib/editing';
 import { useBoard } from '@/lib/store';
 
 /** Texto que vira campo de edição com duplo clique (ou logo ao criar). */
 export default function EditableText({ id, text, placeholder }: { id: string; text: string; placeholder: string }) {
-  const editing = useBoard(s => s.editingId === id);
+  const editing = useIsEditing(id);
   const ref = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {

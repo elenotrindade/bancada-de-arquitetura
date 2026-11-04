@@ -1,8 +1,10 @@
 'use client';
 import { memo, useEffect, useRef } from 'react';
-import { BaseEdge, EdgeLabelRenderer, getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, getBezierPath, getSmoothStepPath, getStraightPath, type EdgeProps } from '@xyflow/react';
 import { COMM_OPTIONS, isAsyncLabel } from '@/lib/catalog';
+import { useIsEditing } from '@/lib/editing';
 import { useBoard } from '@/lib/store';
+import EdgeLabel from './EdgeLabel';
 import type { AppEdge } from '@/lib/types';
 
 function ArchEdge(p: EdgeProps<AppEdge>) {
@@ -14,7 +16,7 @@ function ArchEdge(p: EdgeProps<AppEdge>) {
       : pathType === 'bezier' ? getBezierPath(args)
         : getSmoothStepPath({ ...args, borderRadius: 10 });
 
-  const editing = useBoard(s => s.editingId === id);
+  const editing = useIsEditing(id);
   const ref = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -28,7 +30,7 @@ function ArchEdge(p: EdgeProps<AppEdge>) {
     <>
       <BaseEdge id={id} path={path} markerEnd={markerEnd} interactionWidth={22} style={data?.async ? { strokeDasharray: '6 5' } : undefined} />
       {(text || editing) && (
-        <EdgeLabelRenderer>
+        <EdgeLabel>
           <div
             className={`edge-label nodrag nopan${selected ? ' selected' : ''}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
@@ -42,11 +44,11 @@ function ArchEdge(p: EdgeProps<AppEdge>) {
                   useBoard.getState().updateEdgeData(id, isAsyncLabel(v) && !data?.async ? { label: v, async: true } : { label: v });
                 }}
                 onBlur={() => useBoard.getState().setEditing(null)}
-                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') useBoard.getState().setEditing(null); }}
+                onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); useBoard.getState().setEditing(null); } }}
               />
             ) : text}
           </div>
-        </EdgeLabelRenderer>
+        </EdgeLabel>
       )}
     </>
   );
