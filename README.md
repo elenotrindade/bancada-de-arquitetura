@@ -5,7 +5,7 @@ Simulador para praticar arquitetura de software sem depender do código de nenhu
 ## O que tem
 
 - **Cenários**: encurtador de links, app de delivery, venda de ingressos, agenda de clínicas e um cenário livre. Cada um tem uma mudança de requisito para revelar depois do primeiro desenho.
-- **Canvas estilo Miro**: componentes de arquitetura (20 tipos, com explicação de o que é, quando usar e cuidados), notas adesivas, textos, áreas que agrupam e levam junto o que está dentro, imagens (seletor, arrastar arquivo ou colar com Ctrl+V), conexões com rótulo, síncronas ou assíncronas, em três traçados.
+- **Canvas estilo Miro**: componentes de arquitetura (22 tipos, com explicação de o que é, quando usar e cuidados), notas adesivas, textos, áreas que agrupam e levam junto o que está dentro, imagens (seletor, arrastar arquivo ou colar com Ctrl+V), conexões com rótulo, síncronas ou assíncronas, em três traçados.
 - **Controles**: selecionar e mover o quadro, seleção em caixa, zoom e enquadrar, minimapa, grade magnética, modo mouse ou trackpad, desfazer e refazer, copiar, colar e duplicar, atalhos de teclado.
 - **Decisões (ADRs)** e **perguntas de arquiteto** para autoavaliação.
 - **IA integrada**: escolha Anthropic (Claude), OpenAI (GPT) ou Google (Gemini), cole a sua chave e converse. O resumo do quadro vai junto em toda mensagem; dá para anexar uma imagem do quadro.
@@ -48,7 +48,7 @@ O servidor sobe sozinho. Os testes ficam em `tests/`:
 
 | Arquivo | Cobre |
 | --- | --- |
-| `canvas.spec.ts` | Os 20 tipos de componente, notas, textos, áreas, imagens, conexões, barra do elemento, seleção, copiar e colar, desfazer, zoom, mão, grade e minimapa |
+| `canvas.spec.ts` | Todos os tipos de componente, notas, textos, áreas, imagens, conexões, barra do elemento, seleção, copiar e colar, desfazer, zoom, mão, grade e minimapa |
 | `panels.spec.ts` | Cenários, mudança de requisito, perguntas, decisões, resumo, exportação e persistência |
 | `chat.spec.ts` | Chat com respostas simuladas e uma chamada real com chave inválida, modelos, provedores e cofre da chave |
 | `security.spec.ts` | CSP, cabeçalhos, rotas de IA, quadro adulterado, colar JSON externo, imagens e armazenamento |

@@ -2,7 +2,7 @@ import { CATALOG } from '../lib/catalog';
 import { expect, png, test } from './fixtures';
 
 test.describe('Componentes de arquitetura', () => {
-  test('os 20 tipos podem ser adicionados, renomeados e removidos pela barra do elemento', async ({ app, page }) => {
+  test('todos os tipos do catálogo podem ser adicionados, renomeados e removidos pela barra do elemento', async ({ app, page }) => {
     test.setTimeout(150_000);
     await app.quadroVazio();
     for (const item of Object.values(CATALOG)) {

@@ -68,6 +68,32 @@ test.describe('Decisões (ADRs)', () => {
 });
 
 test.describe('Resumo e arquivo', () => {
+  test('resumo diferencia nomes repetidos, lista quem conversa com quem e traz o diagrama', async ({ app }) => {
+    await app.semear('livre', {
+      nodes: [
+        { id: 'x1', type: 'component', position: { x: 0, y: 0 }, data: { kind: 'servico', name: 'API de pedidos', resp: 'Cria pedidos', tech: '' } },
+        { id: 'x2', type: 'component', position: { x: 300, y: 0 }, data: { kind: 'cache', name: 'Cache', resp: '', tech: '' } },
+        { id: 'x3', type: 'component', position: { x: 300, y: 200 }, data: { kind: 'cache', name: 'Cache', resp: '', tech: '' } },
+        { id: 'x4', type: 'component', position: { x: 600, y: 0 }, data: { kind: 'realtime', name: 'Tempo real (WebSocket/SSE)', resp: '', tech: '' } }
+      ],
+      edges: [
+        { id: 'y1', source: 'x1', target: 'x3', type: 'arch', data: { label: 'Leitura/escrita', async: false, pathType: 'smoothstep' } },
+        { id: 'y2', source: 'x1', target: 'x4', type: 'arch', data: { label: 'Publica evento', async: true, pathType: 'smoothstep' } }
+      ]
+    });
+    const r = await app.resumo();
+    expect(r).toContain('- **Cache 1** (Cache)');
+    expect(r).toContain('- **Cache 2** (Cache)');
+    expect(r).toContain('  - Envia para: Cache 2 (Leitura/escrita, síncrona); Tempo real (WebSocket/SSE) (Publica evento, assíncrona)');
+    expect(r).toContain('  - Recebe de: API de pedidos (Leitura/escrita, síncrona)');
+    expect(r).toContain('- API de pedidos → Cache 2: Leitura/escrita, síncrona');
+    expect(r).toContain('```mermaid\nflowchart LR');
+    expect(r).toMatch(/n1 -->\|Leitura\/escrita\| n3/);
+    expect(r).toMatch(/n1 -\.->\|Publica evento\| n4/);
+    expect(r).toContain('Sem nenhuma conexão: Cache 1.');
+  });
+
+
   test('resumo é copiado para a área de transferência', async ({ app, page }) => {
     await page.getByRole('button', { name: 'Resumo para IA' }).click();
     await expect(page.locator('.modal')).toContainText('Copiado');
