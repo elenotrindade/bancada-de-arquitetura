@@ -5,6 +5,7 @@ import { useIsEditing } from '@/lib/editing';
 import { useBoard } from '@/lib/store';
 import type { FrameNodeT } from '@/lib/types';
 import NodeActions from './NodeActions';
+import { sameNodeView } from './memo';
 
 /**
  * Área de agrupamento (frame do Miro). O interior não captura cliques, então dá para
@@ -39,4 +40,4 @@ function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
     </>
   );
 }
-export default memo(FrameNode);
+export default memo(FrameNode, sameNodeView);

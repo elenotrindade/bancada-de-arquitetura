@@ -5,6 +5,7 @@ import { CATALOG, groupOf } from '@/lib/catalog';
 import type { ComponentNodeT } from '@/lib/types';
 import Handles from './Handles';
 import NodeActions from './NodeActions';
+import { sameNodeView } from './memo';
 
 function ComponentNode({ id, data, selected }: NodeProps<ComponentNodeT>) {
   const c = CATALOG[data.kind];
@@ -21,4 +22,4 @@ function ComponentNode({ id, data, selected }: NodeProps<ComponentNodeT>) {
     </>
   );
 }
-export default memo(ComponentNode);
+export default memo(ComponentNode, sameNodeView);

@@ -81,6 +81,28 @@ async function arrastar(page: Page, x: number, y: number, dx: number, dy: number
   await page.mouse.up();
 }
 
+/**
+ * Latência de uma ação: executa dentro da página e espera o número de componentes
+ * mudar (delta) e o navegador pintar o quadro seguinte. Resolução abaixo de 1 ms.
+ */
+async function latencia(page: Page, acao: 'adicionar' | 'desfazer'): Promise<number> {
+  return page.evaluate(async acao => {
+    const contar = () => document.querySelectorAll('.react-flow__node-component').length;
+    const alvo = contar() + (acao === 'adicionar' ? 1 : -1);
+    const t0 = performance.now();
+    if (acao === 'adicionar') (document.querySelector('.picker button[aria-label="Worker"]') as HTMLButtonElement).click();
+    else document.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', ctrlKey: true, bubbles: true }));
+    await new Promise<void>((resolve, reject) => {
+      const fim = () => requestAnimationFrame(() => setTimeout(resolve, 0));
+      if (contar() === alvo) { fim(); return; }
+      const mo = new MutationObserver(() => { if (contar() === alvo) { mo.disconnect(); fim(); } });
+      mo.observe(document.querySelector('.react-flow__nodes') || document.body, { childList: true, subtree: true });
+      setTimeout(() => { mo.disconnect(); reject(new Error('a ação não mudou o quadro')); }, 10_000);
+    });
+    return Math.round((performance.now() - t0) * 10) / 10;
+  }, acao);
+}
+
 async function marca(page: Page, nome: string) {
   return page.evaluate(n => {
     const e = performance.getEntriesByName(`bancada:${n}`);
@@ -190,26 +212,22 @@ for (const n of [50, 150, 300]) {
       await page.keyboard.press('Control+a');
       r.digitar = await gravar(page, cdp, () => page.keyboard.type('Serviço de pagamentos com fila', { delay: 30 }));
 
-      // 6. adicionar componente pela paleta (tempo até aparecer)
+      // 6. adicionar componente pela paleta: medido dentro da página, do clique até o
+      //    novo elemento estar no DOM e o navegador pintar o quadro seguinte.
       const tempos: number[] = [];
       for (let i = 0; i < 5; i++) {
         await page.getByRole('button', { name: 'Componentes', exact: true }).click();
-        const antes = await page.locator('.react-flow__node-component').count();
-        const t0 = Date.now();
-        await page.locator('.picker').getByRole('button', { name: 'Worker', exact: true }).click();
-        await expect(page.locator('.react-flow__node-component')).toHaveCount(antes + 1);
-        tempos.push(Date.now() - t0);
+        await page.locator('.picker').waitFor();
+        tempos.push(await latencia(page, 'adicionar'));
+        await page.waitForTimeout(150);
       }
       r.adicionar_ms = mediana(tempos);
 
-      // 7. desfazer
+      // 7. desfazer (Ctrl+Z), medido do mesmo jeito
       const td: number[] = [];
       for (let i = 0; i < 3; i++) {
-        const antes = await page.locator('.react-flow__node-component').count();
-        const t0 = Date.now();
-        await page.keyboard.press('Control+z');
-        await expect(page.locator('.react-flow__node-component')).toHaveCount(antes - 1);
-        td.push(Date.now() - t0);
+        td.push(await latencia(page, 'desfazer'));
+        await page.waitForTimeout(150);
       }
       r.desfazer_ms = mediana(td);
 

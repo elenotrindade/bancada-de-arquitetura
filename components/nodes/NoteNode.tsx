@@ -7,6 +7,7 @@ import type { NoteNodeT } from '@/lib/types';
 import EditableText from './EditableText';
 import Handles from './Handles';
 import NodeActions from './NodeActions';
+import { sameNodeView } from './memo';
 
 const snapshotNow = () => useBoard.getState().snapshot();
 
@@ -23,4 +24,4 @@ function NoteNode({ id, data, selected }: NodeProps<NoteNodeT>) {
     </>
   );
 }
-export default memo(NoteNode);
+export default memo(NoteNode, sameNodeView);

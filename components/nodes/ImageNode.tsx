@@ -5,6 +5,7 @@ import { useBoard } from '@/lib/store';
 import type { ImageNodeT } from '@/lib/types';
 import Handles from './Handles';
 import NodeActions from './NodeActions';
+import { sameNodeView } from './memo';
 
 const snapshotNow = () => useBoard.getState().snapshot();
 
@@ -22,4 +23,4 @@ function ImageNode({ id, data, selected }: NodeProps<ImageNodeT>) {
     </>
   );
 }
-export default memo(ImageNode);
+export default memo(ImageNode, sameNodeView);

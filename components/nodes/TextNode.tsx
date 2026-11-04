@@ -7,6 +7,7 @@ import type { TextNodeT } from '@/lib/types';
 import EditableText from './EditableText';
 import Handles from './Handles';
 import NodeActions from './NodeActions';
+import { sameNodeView } from './memo';
 
 const snapshotNow = () => useBoard.getState().snapshot();
 
@@ -23,4 +24,4 @@ function TextNode({ id, data, selected }: NodeProps<TextNodeT>) {
     </>
   );
 }
-export default memo(TextNode);
+export default memo(TextNode, sameNodeView);
