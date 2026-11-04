@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Background, BackgroundVariant, ConnectionLineType, ConnectionMode, MarkerType, MiniMap, ReactFlow, SelectionMode,
-  useReactFlow, type Node, type OnSelectionChangeParams
+  useReactFlow, type OnNodeDrag, type OnSelectionChangeParams
 } from '@xyflow/react';
 import { CATALOG, groupOf, type ComponentKind } from '@/lib/catalog';
 import { uid } from '@/lib/boards';
@@ -190,9 +190,9 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
   }, [rf, addImages, anchor, notify]);
 
   /* ---------- áreas levam junto o que está dentro ---------- */
-  const onNodeDragStart = useCallback((_: React.MouseEvent, _node: Node, dragged: Node[]) => {
+  const onNodeDragStart = useCallback<OnNodeDrag<AppNode>>((_e, _node, dragged) => {
     useBoard.getState().snapshot();
-    const frames = dragged.filter(n => n.type === 'frame') as AppNode[];
+    const frames = dragged.filter(n => n.type === 'frame');
     if (!frames.length) { frameDrag.current = null; return; }
     const draggedIds = new Set(dragged.map(n => n.id));
     const all = useBoard.getState().nodes;
@@ -211,7 +211,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
     frameDrag.current = { start: new Map(frames.map(f => [f.id, { ...f.position }])), children };
   }, []);
 
-  const onNodeDrag = useCallback((_: React.MouseEvent, _node: Node, dragged: Node[]) => {
+  const onNodeDrag = useCallback<OnNodeDrag<AppNode>>((_e, _node, dragged) => {
     const d = frameDrag.current;
     if (!d || !d.children.size) return;
     const cur = new Map(dragged.map(n => [n.id, n.position]));
@@ -304,7 +304,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         {prefs.minimap && (
           <MiniMap
             pannable zoomable position="bottom-right"
-            nodeColor={n => (n.type === 'component' ? groupOf(n.data.kind).mini : n.type === 'frame' ? 'transparent' : '#C9B458')}
+            nodeColor={n => (n.type === 'component' ? groupOf((n as AppNode as { data: { kind: ComponentKind } }).data.kind).mini : n.type === 'frame' ? 'transparent' : '#C9B458')}
             nodeStrokeColor={n => (n.type === 'frame' ? '#7E8D94' : 'transparent')}
             nodeStrokeWidth={3}
             ariaLabel="Minimapa do quadro"
