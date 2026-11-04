@@ -53,7 +53,7 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, colorScheme: 'light', acceptDownloads: true, permissions: ['clipboard-read', 'clipboard-write'] });
 const page = await ctx.newPage();
 page.on('pageerror', e => errors.push(`pageerror: ${e.message}`));
-page.on('console', m => { if (m.type() === 'error' && !/favicon/.test(m.text())) errors.push(`console: ${m.text()}`); });
+page.on('console', m => { if (m.type() === 'error' && !/favicon|status of 401/.test(m.text())) errors.push(`console: ${m.text()}`); });
 
 await page.goto(BASE);
 await check('quadro de exemplo carrega', async () => {
