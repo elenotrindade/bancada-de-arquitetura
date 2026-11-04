@@ -105,7 +105,7 @@ await check('resumo para IA inclui cenário e componentes', async () => {
     if (!t.includes(x)) throw new Error(`faltou "${x}"`);
   }
   await page.screenshot({ path: `${OUT}/04-resumo.png` });
-  await page.getByRole('button', { name: 'Fechar' }).click();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
 });
 
 // ---------- quadro vazio (cenário livre) para criar elementos ----------
@@ -180,7 +180,7 @@ await page.screenshot({ path: `${OUT}/03-elementos-criados.png` });
 await check('resumo inclui anotações e áreas', async () => {
   await page.getByRole('button', { name: 'Resumo para IA' }).click();
   const t = await page.locator('.modal textarea').inputValue();
-  await page.getByRole('button', { name: 'Fechar' }).click();
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click();
   for (const x of ['Risco: o banco aguenta 5x?', '## Áreas', 'Nova área de pedidos', 'imagem']) if (!t.includes(x)) throw new Error(`faltou "${x}"`);
 });
 

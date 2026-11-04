@@ -140,7 +140,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
       if (mod && k === '-') { e.preventDefault(); rf.zoomOut(); return; }
       if (mod && k === '0') { e.preventDefault(); rf.zoomTo(1); return; }
       if (mod || e.altKey) return;
-      if (e.shiftKey && (e.code === 'Digit1' || k === '!')) { e.preventDefault(); rf.fitView({ padding: 0.2, duration: 250 }); return; }
+      if (e.shiftKey && (e.code === 'Digit1' || k === '!')) { e.preventDefault(); rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 }); return; }
       if (e.key === 'Escape') {
         setPickerOpen(false);
         if (s.tool !== 'select') s.setTool('select');
@@ -324,7 +324,7 @@ export default function Canvas({ prefs, setPrefs, notify }: Props) {
         <Background variant={BackgroundVariant.Dots} gap={24} size={1.6} />
         {prefs.minimap && (
           <MiniMap
-            pannable zoomable position="bottom-right"
+            pannable zoomable position="bottom-right" style={{ width: 168, height: 112 }}
             nodeColor={n => (n.type === 'component' ? groupOf((n as AppNode as { data: { kind: ComponentKind } }).data.kind).mini : n.type === 'frame' ? 'transparent' : '#C9B458')}
             nodeStrokeColor={n => (n.type === 'frame' ? '#7E8D94' : 'transparent')}
             nodeStrokeWidth={3}

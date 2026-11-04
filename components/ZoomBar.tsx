@@ -23,7 +23,7 @@ export default function ZoomBar({ prefs, setPrefs }: { prefs: Prefs; setPrefs: (
         <button type="button" className="tool" aria-label="Diminuir zoom" onClick={() => rf.zoomOut({ duration: 150 })}><IconMinus /><span className="tip">Diminuir <span className="kbd">Ctrl −</span></span></button>
         <button type="button" className="zoom-pct" onClick={() => rf.zoomTo(1, { duration: 150 })} title="Voltar a 100% (Ctrl 0)">{Math.round(zoom * 100)}%</button>
         <button type="button" className="tool" aria-label="Aumentar zoom" onClick={() => rf.zoomIn({ duration: 150 })}><IconPlus /><span className="tip">Aumentar <span className="kbd">Ctrl +</span></span></button>
-        <button type="button" className="tool" aria-label="Enquadrar tudo" onClick={() => rf.fitView({ padding: 0.2, duration: 250 })}><IconFit /><span className="tip">Enquadrar tudo <span className="kbd">Shift 1</span></span></button>
+        <button type="button" className="tool" aria-label="Enquadrar tudo" onClick={() => rf.fitView({ padding: 0.2, maxZoom: 1, duration: 250 })}><IconFit /><span className="tip">Enquadrar tudo <span className="kbd">Shift 1</span></span></button>
       </div>
     </>
   );
