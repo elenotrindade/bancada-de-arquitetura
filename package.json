@@ -1,0 +1,38 @@
+{
+  "name": "bancada-de-arquitetura",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Simulador para praticar arquitetura de software: canvas estilo Miro, cenários, ADRs e feedback de IA.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "typecheck": "tsc --noEmit",
+    "test": "playwright test --project=funcional",
+    "bench": "PW_JSON=bench-results/desempenho-testes.json playwright test --project=desempenho --workers=1; node scripts/bench-report.mjs",
+    "bench:relatorio": "node scripts/bench-report.mjs"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.1.0",
+    "@xyflow/react": "^12.8.0",
+    "html-to-image": "1.11.13",
+    "idb-keyval": "^6.2.1",
+    "next": "^16.0.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
+    "zustand": "^5.1.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.65.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  }
+}
